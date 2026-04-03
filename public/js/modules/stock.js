@@ -154,6 +154,9 @@ function renderizarLineasMateriales() {
     });
 }
 
+let _datosOTPendientes = null;
+let _otTieneMateriales = false;
+
 function guardarOTFinal(tieneMateriales) {
     if (modoEdicionOT) {
         if (!tieneMateriales) { cerrarModal('modalPreguntaMateriales'); return; }
@@ -179,7 +182,8 @@ function guardarOTFinal(tieneMateriales) {
         arrayLineasMat = [];
         cerrarModal('modalPreguntaMateriales');
     }
-    const datos = {
+
+    _datosOTPendientes = {
         codigo_ot:        document.getElementById('codigo_ot').value,
         fecha_encargo:    document.getElementById('fecha_encargo').value,
         fecha_completada: document.getElementById('fecha_completada').value,
@@ -191,13 +195,31 @@ function guardarOTFinal(tieneMateriales) {
         cliente_id:       document.getElementById('ot_cliente_id').value || null,
         lineas_materiales: arrayLineasMat
     };
+    _otTieneMateriales = tieneMateriales;
+
+    // Solo admin y director eligen el precio/hora; técnicos usan 15 € por defecto
+    if (sesion.rol === 'admin' || sesion.rol === 'director') {
+        document.getElementById('inputPrecioHora').value = 15;
+        if (tieneMateriales) cerrarModal('modalLineasMateriales');
+        document.getElementById('modalPrecioHora').style.display = 'block';
+    } else {
+        _enviarOT(15);
+    }
+}
+
+function confirmarPrecioHora(precio) {
+    document.getElementById('modalPrecioHora').style.display = 'none';
+    _enviarOT(parseFloat(precio) || 15);
+}
+
+function _enviarOT(precioHora) {
+    const datos = Object.assign({}, _datosOTPendientes, { precio_hora: precioHora });
     API.post('/api/ot', datos).then(data => {
         if (data.error) alert('❌ ' + data.error);
         else {
             alert('ℹ️ ' + data.mensaje);
             document.getElementById('formOT').reset();
             tecnicosSeleccionados = []; renderizarTecnicosOT();
-            if (tieneMateriales) cerrarModal('modalLineasMateriales');
             cargarOTs(); cargarStock();
         }
     });

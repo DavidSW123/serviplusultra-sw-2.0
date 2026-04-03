@@ -81,13 +81,14 @@ async function crear(req, res) {
         const r = await db.execute({
             sql:  `INSERT INTO ordenes_trabajo
                        (codigo_ot, fecha_encargo, fecha_completada, horas, num_tecnicos,
-                        marca, tipo_urgencia, materiales_precio, estado, cliente_id, tecnicos_nombres)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        marca, tipo_urgencia, materiales_precio, estado, cliente_id, tecnicos_nombres, precio_hora)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 datos.codigo_ot, datos.fecha_encargo, datos.fecha_completada || null,
                 datos.horas, datos.num_tecnicos, datos.marca, datos.tipo_urgencia,
                 datos.materiales_precio, estado, datos.cliente_id || null,
-                datos.tecnicos_nombres || ''
+                datos.tecnicos_nombres || '',
+                parseFloat(datos.precio_hora) || 15
             ]
         });
 

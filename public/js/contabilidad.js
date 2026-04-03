@@ -32,6 +32,7 @@ API.get('/api/contabilidad/resumen').then(data => {
 
     document.getElementById('kpiIngresos').innerText   = fmt(k.ingresos_base);
     document.getElementById('kpiMateriales').innerText = fmt(k.costes_materiales);
+    document.getElementById('kpiCosteMO').innerText    = fmt(k.costes_mo);
     document.getElementById('kpiGastos').innerText     = fmt(k.gastos_generales);
     document.getElementById('kpiTotalIva').innerText   = fmt(k.ingresos_total);
 
@@ -92,8 +93,8 @@ API.get('/api/contabilidad/resumen').then(data => {
     }
 
     // Horas por técnico
-    renderTabla('tablaHoras', data.horas_por_tecnico, 2,
-        t => `<td>👷 ${t.tecnicos_nombres || '—'}</td><td><strong>${parseFloat(t.horas_totales).toFixed(1)} h</strong></td>`
+    renderTabla('tablaHoras', data.horas_por_tecnico, 3,
+        t => `<td>👷 ${t.tecnicos_nombres || '—'}</td><td><strong>${parseFloat(t.horas_totales).toFixed(1)} h</strong></td><td>${fmt(t.coste_mo || 0)}</td>`
     );
 
     // Top clientes por facturación

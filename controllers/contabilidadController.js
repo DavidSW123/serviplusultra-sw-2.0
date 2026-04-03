@@ -39,13 +39,22 @@ async function getResumen(req, res) {
             GROUP BY estado
         `);
 
-        // Horas trabajadas por técnico
+        // Horas trabajadas por técnico + coste MO
         const rHoras = await db.execute(`
-            SELECT tecnicos_nombres, SUM(horas) AS horas_totales
+            SELECT tecnicos_nombres,
+                   SUM(horas) AS horas_totales,
+                   SUM(horas * num_tecnicos * precio_hora) AS coste_mo
             FROM ordenes_trabajo
             WHERE estado = 'HECHO'
             GROUP BY tecnicos_nombres
             ORDER BY horas_totales DESC
+        `);
+
+        // Coste total de mano de obra
+        const rCosteMO = await db.execute(`
+            SELECT COALESCE(SUM(horas * num_tecnicos * COALESCE(precio_hora, 15)), 0) AS total_mo
+            FROM ordenes_trabajo
+            WHERE estado = 'HECHO'
         `);
 
         // Ranking clientes por facturación (ingresos base)
@@ -98,15 +107,17 @@ async function getResumen(req, res) {
         const ingresos_total = parseFloat(rTotales.rows[0]?.ingresos_total || 0);
         const costes_mat     = parseFloat(rMateriales.rows[0]?.total_materiales || 0);
         const gastos_gen     = parseFloat(rGastos.rows[0]?.total_gastos || 0);
+        const coste_mo       = parseFloat(rCosteMO.rows[0]?.total_mo || 0);
 
         res.json({
             kpis: {
                 ingresos_base:     ingresos_base.toFixed(2),
                 ingresos_total:    ingresos_total.toFixed(2),
                 costes_materiales: costes_mat.toFixed(2),
+                costes_mo:         coste_mo.toFixed(2),
                 gastos_generales:  gastos_gen.toFixed(2),
                 beneficio_bruto:   (ingresos_base - costes_mat).toFixed(2),
-                beneficio_neto:    (ingresos_base - costes_mat - gastos_gen).toFixed(2),
+                beneficio_neto:    (ingresos_base - costes_mat - coste_mo - gastos_gen).toFixed(2),
             },
             evolucion_mensual:      rFacturas.rows,
             ots_por_estado:         rOTs.rows,

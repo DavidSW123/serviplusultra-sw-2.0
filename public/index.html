@@ -253,6 +253,25 @@
     <div id="modalEditarLog" class="modal"><div class="modal-content" style="max-width: 600px;"><span class="close-modal" onclick="cerrarModal('modalEditarLog')">&times;</span><h2 style="margin-top:0;">✏️ Editar Petición</h2><form id="formEditarLog"><input type="hidden" id="editLogId"><div class="form-group"><label>Código de OT</label><input type="text" id="e_codigo_ot" required></div><div class="grid-2"><div class="form-group"><label>Fecha encargo</label><input type="datetime-local" id="e_fecha_encargo" required></div><div class="form-group"><label>Finalización</label><input type="datetime-local" id="e_fecha_completada"></div></div><div class="grid-2"><div class="form-group"><label>Horas</label><input type="number" step="0.1" id="e_horas" required></div><div class="form-group"><label>Técnicos</label><div style="display:flex; gap:10px;"><select id="e_selTecnicosAdd" style="flex-grow:1;"><option value="">-- Seleccionar --</option></select><button type="button" class="btn-secundario" style="margin:0; padding:10px;" onclick="agregarETecnicoOT()">Añadir</button></div><div id="e_listaTecnicosOT" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div></div></div><div class="form-group"><label>Marca</label><input type="text" id="e_marca" required></div><div class="grid-2"><div class="form-group"><label>Urgencia</label><select id="e_tipo_urgencia"><option value="Verde">🟢 Verde</option><option value="Amarillo">🟡 Amarillo</option><option value="Rojo">🔴 Rojo</option></select></div><div class="form-group"><label>Materiales (€)</label><input type="number" step="0.01" id="e_materiales_precio" required></div></div><button type="button" class="btn-save" onclick="guardarEdicionLog()">Guardar Cambios</button></form></div></div>
     <div id="modalLogs" class="modal"><div class="modal-content" style="max-width: 1000px;"><span class="close-modal" onclick="cerrarModal('modalLogs')">&times;</span><h2 style="margin-top:0;">📝 Auditoría</h2><table class="tabla-logs"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Referencia</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="cuerpoLogs"></tbody></table></div></div>
     <div id="modalPassword" class="modal"><div class="modal-content"><span class="close-modal" onclick="cerrarModal('modalPassword')">&times;</span><h2 style="margin-top:0;">🔑 Cambiar Clave</h2><input type="password" id="oldPass" placeholder="Actual" class="form-group"><input type="password" id="newPass" placeholder="Nueva" class="form-group"><button class="btn-save" onclick="guardarPassword()">Guardar</button></div></div>
+
+    <div id="modalPrecioHora" class="modal" style="z-index:5000;">
+        <div class="modal-content" style="max-width:420px; text-align:center;">
+            <h2 style="margin-top:0;">💶 Precio de mano de obra</h2>
+            <p style="color:#7f8c8d; margin-bottom:20px;">¿A cuánto se cobra la hora por técnico en esta OT?</p>
+            <div style="display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:24px;">
+                <label style="font-size:1em; color:#2c3e50;">€ / hora:</label>
+                <input type="number" id="inputPrecioHora" value="15" step="0.5" min="0"
+                       style="width:100px; padding:10px; font-size:1.2em; font-weight:bold; border:2px solid #1abc9c; border-radius:8px; text-align:center;">
+            </div>
+            <div style="background:#f8f9fa; border-radius:8px; padding:10px 16px; margin-bottom:20px; font-size:0.88em; color:#7f8c8d;">
+                Tarifa estándar: <strong style="color:#2c3e50;">15 €/h</strong> por técnico
+            </div>
+            <div style="display:flex; gap:10px; justify-content:center;">
+                <button class="btn-secundario" onclick="confirmarPrecioHora(15)">✅ Usar 15 €/h</button>
+                <button class="btn-save" style="margin:0;" onclick="confirmarPrecioHora(parseFloat(document.getElementById('inputPrecioHora').value)||15)">Confirmar precio</button>
+            </div>
+        </div>
+    </div>
     <div id="modalTecnico" class="modal"><div class="modal-content"><span class="close-modal" onclick="cerrarModal('modalTecnico')">&times;</span><h2 style="margin-top:0;">👷 Crear Técnico</h2><input type="text" id="newTecUser" placeholder="Usuario" class="form-group"><input type="text" id="newTecPass" placeholder="Clave" class="form-group"><button class="btn-save" onclick="crearTecnico()">Crear</button></div></div>
 
     <!-- Core -->
