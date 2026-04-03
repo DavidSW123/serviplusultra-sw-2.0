@@ -15,7 +15,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
 </head>
 <body>
 
@@ -250,6 +252,24 @@
     <div id="modalPassword" class="modal"><div class="modal-content"><span class="close-modal" onclick="cerrarModal('modalPassword')">&times;</span><h2 style="margin-top:0;">🔑 Cambiar Clave</h2><input type="password" id="oldPass" placeholder="Actual" class="form-group"><input type="password" id="newPass" placeholder="Nueva" class="form-group"><button class="btn-save" onclick="guardarPassword()">Guardar</button></div></div>
     <div id="modalTecnico" class="modal"><div class="modal-content"><span class="close-modal" onclick="cerrarModal('modalTecnico')">&times;</span><h2 style="margin-top:0;">👷 Crear Técnico</h2><input type="text" id="newTecUser" placeholder="Usuario" class="form-group"><input type="text" id="newTecPass" placeholder="Clave" class="form-group"><button class="btn-save" onclick="crearTecnico()">Crear</button></div></div>
 
-    <script src="/js/main.js"></script>
+    <!-- Core -->
+    <script src="/js/api.js"></script>
+    <script src="/js/ui.js"></script>
+    <!-- Módulos -->
+    <script src="/js/modules/stock.js"></script>
+    <script src="/js/modules/clientes.js"></script>
+    <script src="/js/modules/ot.js"></script>
+    <script src="/js/modules/facturas.js"></script>
+    <script src="/js/modules/ia.js"></script>
+    <script src="/js/modules/splitwise.js"></script>
+    <script src="/js/modules/logs.js"></script>
+    <script src="/js/modules/usuarios.js"></script>
+    <!-- Init -->
+    <script>
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+        inicializarUI();
+        cargarClientes();
+        setTimeout(cargarOTs, 500);
+    </script>
 </body>
 </html>

@@ -1,0 +1,46 @@
+/* ── TOP BAR ────────────────────────────────────────────────── */
+.top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+.avatar-mini { width: 45px; height: 45px; border-radius: 50%; border: 2px solid #ccc; cursor: pointer; object-fit: cover; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.2s; }
+
+/* ── MENÚ LATERAL ───────────────────────────────────────────── */
+.overlay-menu { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2999; }
+.side-menu { position: fixed; top: 0; right: -350px; width: 320px; height: 100%; background: #2c3e50; color: white; transition: right 0.3s ease; z-index: 3000; box-shadow: -4px 0 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; overflow-y: auto; }
+.side-menu.open { right: 0; }
+.close-menu { position: absolute; top: 15px; left: 20px; font-size: 30px; cursor: pointer; color: #aaa; }
+.perfil-header { text-align: center; padding: 40px 20px 20px 20px; border-bottom: 1px solid #34495e; }
+.avatar-container { position: relative; width: 120px; height: 120px; margin: 0 auto 15px auto; cursor: pointer; border-radius: 50%; overflow: hidden; border: 4px solid #1abc9c; }
+.avatar-large { width: 100%; height: 100%; object-fit: cover; background: #fff; }
+.menu-items { padding: 20px; flex-grow: 1; }
+.btn-side { width: 100%; background: #34495e; color: white; border: none; padding: 12px; margin-bottom: 10px; border-radius: 5px; cursor: pointer; text-align: left; font-size: 15px; transition: 0.2s; }
+.btn-side:hover { background: #1abc9c; }
+.btn-side-red { background: #e74c3c; text-align: center; font-weight: bold; border-radius: 0; padding: 20px; width: 100%; border: none; cursor: pointer; color: white; font-size: 16px; margin-top: auto; }
+
+/* ── MODALES ────────────────────────────────────────────────── */
+.modal { display: none; position: fixed; z-index: 4000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); overflow-y: auto; }
+.modal-content { background-color: #fff; margin: 5% auto; padding: 30px; border-radius: 10px; width: 90%; max-width: 500px; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+.close-modal { position: absolute; right: 20px; top: 15px; font-size: 24px; cursor: pointer; color: #aaa; transition: 0.3s; z-index: 10; }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────── */
+@media screen and (max-width: 768px) {
+    body { padding: 10px; }
+    .container { padding: 15px; }
+    .grid-2 { grid-template-columns: 1fr; gap: 10px; }
+    .top-bar { flex-direction: column-reverse; gap: 15px; text-align: center; }
+    .modal-content-folio { padding: 20px; width: 95%; margin: 10% auto; }
+    .factura-header { flex-direction: column; gap: 20px; align-items: center; text-align: center; }
+    .datos-factura { text-align: center; }
+    .ticket-gallery { grid-template-columns: 1fr; }
+}
+
+/* ── PRINT ──────────────────────────────────────────────────── */
+@media print {
+    .no-print { display: none !important; }
+    .only-print { display: block !important; }
+    html, body { background: white; padding: 0; margin: 0; height: auto !important; overflow: visible !important; }
+    .container, .overlay-menu, .side-menu, .modal { display: none !important; }
+    #modalFactura { display: block !important; position: relative !important; width: 100% !important; background: white !important; }
+    .modal-content-folio { box-shadow: none !important; margin: 0 !important; padding: 0 !important; max-width: 100% !important; border: none !important; }
+    .close-modal, .btn-secundario, .btn-save, .btn-peligro, th:last-child, td:last-child { display: none !important; }
+    .tabla-holded input { border: none !important; background: transparent !important; padding: 0 !important; font-family: inherit; color: black !important; }
+    ::-webkit-inner-spin-button, ::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+}
