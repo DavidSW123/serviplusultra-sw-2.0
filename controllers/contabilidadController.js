@@ -39,6 +39,36 @@ async function getResumen(req, res) {
             GROUP BY estado
         `);
 
+        // Lista completa de OTs con cliente
+        const rOTsLista = await db.execute(`
+            SELECT ot.id, ot.codigo_ot, ot.fecha_encargo, ot.fecha_completada,
+                   ot.horas, ot.num_tecnicos, ot.precio_hora, ot.tecnicos_nombres,
+                   ot.marca, ot.tipo_urgencia, ot.materiales_precio, ot.estado,
+                   ot.horas * ot.num_tecnicos * COALESCE(ot.precio_hora,15) AS coste_mo,
+                   c.nombre AS cliente_nombre
+            FROM ordenes_trabajo ot
+            LEFT JOIN clientes c ON c.id = ot.cliente_id
+            ORDER BY ot.id DESC
+        `);
+
+        // Lista completa de facturas con OT y cliente
+        const rFacturasLista = await db.execute(`
+            SELECT f.id, f.fecha_emision, f.base_imponible, f.iva, f.total,
+                   ot.codigo_ot, c.nombre AS cliente_nombre
+            FROM facturas f
+            LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
+            LEFT JOIN clientes c ON c.id = ot.cliente_id
+            ORDER BY f.id DESC
+        `);
+
+        // Lista de gastos socios
+        const rGastosLista = await db.execute(`
+            SELECT id, pagador, concepto, importe, fecha, implicados
+            FROM gastos_socios
+            WHERE concepto NOT LIKE '[PAGO]%'
+            ORDER BY id DESC
+        `);
+
         // Horas trabajadas por técnico + coste MO
         const rHoras = await db.execute(`
             SELECT tecnicos_nombres,
@@ -125,6 +155,9 @@ async function getResumen(req, res) {
             clientes_ingresos:      rClientesIngresos.rows,
             clientes_materiales:    rClientesMateriales.rows,
             clientes_ots:           rClientesOTs.rows,
+            ots_lista:              rOTsLista.rows,
+            facturas_lista:         rFacturasLista.rows,
+            gastos_lista:           rGastosLista.rows,
         });
     } catch (e) {
         res.status(500).json({ error: e.message });

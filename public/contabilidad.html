@@ -15,7 +15,8 @@
         .top-bar-cont a:hover { color:#1abc9c; }
 
         .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:28px; }
-        .kpi-card { background:#fff; border-radius:10px; padding:20px 24px; box-shadow:0 2px 8px rgba(0,0,0,0.07); border-left:4px solid #1abc9c; }
+        .kpi-card { background:#fff; border-radius:10px; padding:20px 24px; box-shadow:0 2px 8px rgba(0,0,0,0.07); border-left:4px solid #1abc9c; cursor:pointer; transition:transform 0.15s, box-shadow 0.15s; }
+        .kpi-card:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,0.13); }
         .kpi-card.rojo   { border-color:#e74c3c; }
         .kpi-card.azul   { border-color:#3498db; }
         .kpi-card.naranja{ border-color:#e67e22; }
@@ -31,7 +32,8 @@
         .panel h3 { margin:0 0 16px 0; font-size:1em; color:#2c3e50; border-bottom:2px solid #1abc9c; padding-bottom:8px; }
 
         .ots-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; text-align:center; }
-        .ot-stat { padding:14px; border-radius:8px; }
+        .ot-stat { padding:14px; border-radius:8px; cursor:pointer; transition:opacity 0.15s; }
+        .ot-stat:hover { opacity:0.8; }
         .ot-stat .num { font-size:1.8em; font-weight:bold; }
         .ot-stat .lbl { font-size:0.8em; color:#7f8c8d; margin-top:4px; }
         .ot-stat.hecho    { background:#eafaf1; }
@@ -41,6 +43,23 @@
         .tabla-tec { width:100%; border-collapse:collapse; font-size:0.9em; }
         .tabla-tec th { background:#f8f9fa; padding:8px 10px; text-align:left; color:#7f8c8d; font-weight:600; border-bottom:1px solid #eee; }
         .tabla-tec td { padding:8px 10px; border-bottom:1px solid #f0f0f0; }
+        .tabla-tec tbody tr { cursor:pointer; transition:background 0.12s; }
+        .tabla-tec tbody tr:hover { background:#f0faf8; }
+
+        /* Modal detalle */
+        .modal-detalle { display:none; position:fixed; z-index:5000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.65); overflow-y:auto; }
+        .modal-detalle-content { background:#fff; margin:4% auto; padding:28px 30px; border-radius:12px; width:92%; max-width:860px; box-shadow:0 8px 30px rgba(0,0,0,0.2); position:relative; }
+        .modal-detalle-content h3 { margin:0 0 18px 0; color:#2c3e50; font-size:1.1em; border-bottom:2px solid #1abc9c; padding-bottom:8px; }
+        .tabla-detalle { width:100%; border-collapse:collapse; font-size:0.88em; }
+        .tabla-detalle th { background:#2c3e50; color:#fff; padding:9px 12px; text-align:left; font-weight:600; }
+        .tabla-detalle td { padding:8px 12px; border-bottom:1px solid #f0f0f0; }
+        .tabla-detalle tbody tr:nth-child(even) { background:#f8f9fa; }
+        .badge-est { display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.8em; font-weight:600; }
+        .badge-est.HECHO    { background:#eafaf1; color:#27ae60; }
+        .badge-est.PENDIENTE{ background:#fef9e7; color:#e67e22; }
+        .badge-est.ANULADO  { background:#fdedec; color:#e74c3c; }
+        .panel { cursor:pointer; transition:box-shadow 0.15s; }
+        .panel:hover { box-shadow:0 4px 18px rgba(0,0,0,0.13); }
 
         @media(max-width:768px) {
             .kpi-grid   { grid-template-columns:1fr 1fr; }
@@ -139,6 +158,21 @@
                 <tbody id="tablaClientesOTs"></tbody>
             </table>
         </div>
+    </div>
+</div>
+
+<!-- Modal de detalle drill-down -->
+<div class="modal-detalle" id="modalDetalle" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-detalle-content">
+        <span style="position:absolute;right:18px;top:14px;font-size:22px;cursor:pointer;color:#aaa;" onclick="document.getElementById('modalDetalle').style.display='none'">&times;</span>
+        <h3 id="detalleTitle"></h3>
+        <div style="overflow-x:auto;">
+            <table class="tabla-detalle">
+                <thead id="detalleThead"></thead>
+                <tbody id="detalleTbody"></tbody>
+            </table>
+        </div>
+        <div id="detalleSinDatos" style="display:none; text-align:center; color:#aaa; padding:30px;">Sin datos</div>
     </div>
 </div>
 
