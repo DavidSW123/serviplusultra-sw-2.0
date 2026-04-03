@@ -21,6 +21,7 @@ app.use('/api', apiRoutes);
 app.get('/',              (_req, res) => res.sendFile(path.join(__dirname, 'public', 'hub.html')));
 app.get('/facturas',      (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/contabilidad',  (_req, res) => res.sendFile(path.join(__dirname, 'public', 'contabilidad.html')));
+app.get('/presupuestos',  (_req, res) => res.sendFile(path.join(__dirname, 'public', 'presupuestos.html')));
 app.get('/bbdd',          (_req, res) => res.sendFile(path.join(__dirname, 'public', 'bbdd.html')));
 app.get('/login',         (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 

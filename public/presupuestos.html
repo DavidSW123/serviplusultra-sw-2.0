@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presupuestos — ServiPlusUltra</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1abc9c">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        .top-bar-pres { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+        .top-bar-pres a { color:#7f8c8d; text-decoration:none; font-size:0.9em; }
+        .top-bar-pres a:hover { color:#9b59b6; }
+
+        .btn-nuevo { background:#9b59b6; color:#fff; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; font-size:0.95em; font-weight:600; }
+        .btn-nuevo:hover { background:#8e44ad; }
+
+        /* Filtros */
+        .filtros-pres { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+        .filtros-pres select, .filtros-pres input { padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:0.9em; }
+
+        /* Lista */
+        .pres-lista { display:flex; flex-direction:column; gap:12px; }
+
+        .pres-card {
+            background:#fff;
+            border-radius:10px;
+            padding:16px 20px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            display:grid;
+            grid-template-columns: 1fr auto;
+            gap:10px;
+            align-items:center;
+            border-left:4px solid #9b59b6;
+            cursor:pointer;
+            transition:box-shadow 0.15s;
+        }
+        .pres-card:hover { box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+        .pres-card.BORRADOR  { border-color:#95a5a6; }
+        .pres-card.ENVIADO   { border-color:#3498db; }
+        .pres-card.ACEPTADO  { border-color:#27ae60; }
+        .pres-card.RECHAZADO { border-color:#e74c3c; }
+        .pres-card.CONVERTIDO{ border-color:#1abc9c; }
+
+        .pres-ref   { font-weight:700; color:#2c3e50; font-size:1em; }
+        .pres-cliente { color:#7f8c8d; font-size:0.88em; margin-top:2px; }
+        .pres-desc  { color:#555; font-size:0.85em; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:400px; }
+        .pres-meta  { display:flex; gap:16px; align-items:center; }
+        .pres-total { font-size:1.15em; font-weight:bold; color:#2c3e50; }
+        .pres-fecha { font-size:0.8em; color:#aaa; }
+
+        .badge-estado {
+            display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.78em; font-weight:600;
+        }
+        .badge-estado.BORRADOR  { background:#f0f0f0; color:#7f8c8d; }
+        .badge-estado.ENVIADO   { background:#ebf5fb; color:#2980b9; }
+        .badge-estado.ACEPTADO  { background:#eafaf1; color:#27ae60; }
+        .badge-estado.RECHAZADO { background:#fdedec; color:#e74c3c; }
+        .badge-estado.CONVERTIDO{ background:#e8f8f5; color:#1abc9c; }
+
+        .pres-acciones { display:flex; gap:8px; }
+        .pres-acciones button { padding:6px 12px; border:none; border-radius:6px; cursor:pointer; font-size:0.82em; font-weight:600; }
+        .btn-editar    { background:#f8f9fa; color:#2c3e50; border:1px solid #ddd !important; }
+        .btn-editar:hover { background:#e9ecef; }
+        .btn-enviar    { background:#3498db; color:#fff; }
+        .btn-enviar:hover { background:#2980b9; }
+        .btn-aceptar   { background:#27ae60; color:#fff; }
+        .btn-aceptar:hover { background:#1e8449; }
+        .btn-rechazar  { background:#e74c3c; color:#fff; }
+        .btn-rechazar:hover { background:#c0392b; }
+        .btn-convertir { background:#1abc9c; color:#fff; }
+        .btn-convertir:hover { background:#17a589; }
+        .btn-pdf       { background:#9b59b6; color:#fff; }
+        .btn-pdf:hover { background:#8e44ad; }
+        .btn-eliminar  { background:#fff0f0; color:#e74c3c; border:1px solid #e74c3c !important; }
+        .btn-eliminar:hover { background:#fdedec; }
+
+        /* Modal presupuesto */
+        .modal-lineas { margin-top:14px; }
+        .linea-pres { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; margin-bottom:8px; }
+        .linea-pres input { padding:7px 10px; border:1px solid #ddd; border-radius:6px; font-size:0.9em; }
+        .linea-pres .btn-rm { background:#fdedec; color:#e74c3c; border:none; border-radius:6px; padding:7px 10px; cursor:pointer; font-weight:bold; }
+        .btn-add-linea { background:#eafaf1; color:#27ae60; border:none; padding:7px 14px; border-radius:6px; cursor:pointer; font-size:0.88em; font-weight:600; margin-top:4px; }
+
+        .resumen-pres { background:#f8f9fa; border-radius:8px; padding:12px 16px; margin-top:14px; font-size:0.92em; }
+        .resumen-pres div { display:flex; justify-content:space-between; padding:3px 0; }
+        .resumen-pres .total-final { font-weight:bold; font-size:1.05em; border-top:1px solid #ddd; margin-top:6px; padding-top:6px; }
+
+        /* PDF template */
+        #pdfPresupuesto { display:none; }
+
+        @media(max-width:600px){
+            .pres-card { grid-template-columns:1fr; }
+            .pres-acciones { flex-wrap:wrap; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="top-bar-pres">
+        <a href="/">← Volver al inicio</a>
+        <h2 style="margin:0; border:none; padding:0; font-size:1.2em;">📋 Presupuestos</h2>
+        <button class="btn-nuevo" onclick="abrirNuevoPresupuesto()">+ Nuevo presupuesto</button>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filtros-pres">
+        <select id="filtroEstado" onchange="filtrarPresupuestos()">
+            <option value="">Todos los estados</option>
+            <option value="BORRADOR">Borrador</option>
+            <option value="ENVIADO">Enviado</option>
+            <option value="ACEPTADO">Aceptado</option>
+            <option value="RECHAZADO">Rechazado</option>
+            <option value="CONVERTIDO">Convertido a OT</option>
+        </select>
+        <input type="text" id="filtroBuscar" placeholder="Buscar por referencia o cliente..." oninput="filtrarPresupuestos()" style="min-width:220px;">
+    </div>
+
+    <!-- Lista -->
+    <div class="pres-lista" id="presLista">
+        <p style="color:#aaa; text-align:center; padding:40px 0;">Cargando presupuestos...</p>
+    </div>
+</div>
+
+<!-- Modal: Nuevo / Editar presupuesto -->
+<div class="modal" id="modalPresupuesto" style="display:none;">
+    <div class="modal-content" style="max-width:680px;">
+        <h3 id="modalPresTitle">Nuevo presupuesto</h3>
+
+        <div class="form-group">
+            <label>Cliente</label>
+            <select id="presCliente"></select>
+        </div>
+        <div class="form-group">
+            <label>Descripción / Trabajo a realizar</label>
+            <textarea id="presDescripcion" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-family:inherit; resize:vertical;"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Notas internas</label>
+            <input type="text" id="presNotas" placeholder="Notas opcionales...">
+        </div>
+
+        <div class="modal-lineas">
+            <label style="font-weight:600; color:#2c3e50; font-size:0.9em;">Líneas del presupuesto</label>
+            <div id="lineasPres"></div>
+            <button class="btn-add-linea" onclick="addLineaPres()">+ Añadir línea</button>
+        </div>
+
+        <div class="resumen-pres" id="resumenPres">
+            <div><span>Base imponible</span><span id="presBase">0,00 €</span></div>
+            <div><span>IVA (21%)</span><span id="presIva">0,00 €</span></div>
+            <div class="total-final"><span>Total</span><span id="presTotal">0,00 €</span></div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end;">
+            <button class="btn-secondary" onclick="cerrarModal('modalPresupuesto')">Cancelar</button>
+            <button class="btn-primary" onclick="guardarPresupuesto()">Guardar presupuesto</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Convertir a OT -->
+<div class="modal" id="modalConvertir" style="display:none;">
+    <div class="modal-content" style="max-width:400px;">
+        <h3>Convertir a Orden de Trabajo</h3>
+        <input type="hidden" id="convertirPresId">
+        <div class="form-group">
+            <label>Técnicos asignados</label>
+            <input type="text" id="convertirTecnicos" placeholder="Ej: Giancarlo, David">
+        </div>
+        <div class="form-group">
+            <label>Fecha de encargo</label>
+            <input type="date" id="convertirFecha">
+        </div>
+        <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end;">
+            <button class="btn-secondary" onclick="cerrarModal('modalConvertir')">Cancelar</button>
+            <button class="btn-convertir" style="padding:10px 20px;" onclick="ejecutarConversion()">Crear OT</button>
+        </div>
+    </div>
+</div>
+
+<!-- PDF invisible -->
+<div id="pdfPresupuesto">
+    <div style="font-family:'Segoe UI',Arial,sans-serif; padding:40px; max-width:700px; margin:0 auto; color:#2c3e50;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px;">
+            <div>
+                <div style="font-size:1.5em; font-weight:bold; color:#9b59b6;">ServiPlusUltra Solutions S.L.</div>
+                <div style="font-size:0.88em; color:#7f8c8d; margin-top:4px;">NIF: B-26892760</div>
+                <div style="font-size:0.88em; color:#7f8c8d;">Carrer d'Aribau 168, 1-1, 08036 Barcelona</div>
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:1.2em; font-weight:bold;" id="pdfRef">—</div>
+                <div style="font-size:0.85em; color:#7f8c8d;" id="pdfFecha">—</div>
+            </div>
+        </div>
+        <div style="background:#f8f4ff; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
+            <div style="font-size:0.8em; color:#9b59b6; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Cliente</div>
+            <div style="font-weight:600;" id="pdfCliente">—</div>
+            <div style="font-size:0.85em; color:#7f8c8d;" id="pdfClienteDir">—</div>
+            <div style="font-size:0.85em; color:#7f8c8d;" id="pdfClienteNif">—</div>
+        </div>
+        <div style="margin-bottom:20px;">
+            <div style="font-size:0.8em; color:#9b59b6; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">Descripción del trabajo</div>
+            <div id="pdfDesc" style="font-size:0.92em; line-height:1.6;">—</div>
+        </div>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.88em;" id="pdfLineasTable">
+            <thead>
+                <tr style="background:#9b59b6; color:#fff;">
+                    <th style="padding:8px 12px; text-align:left; border-radius:4px 0 0 0;">Concepto</th>
+                    <th style="padding:8px 12px; text-align:right; border-radius:0 4px 0 0;">Importe</th>
+                </tr>
+            </thead>
+            <tbody id="pdfLineas"></tbody>
+        </table>
+        <div style="margin-left:auto; width:220px;">
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
+                <span style="color:#7f8c8d;">Base imponible</span><span id="pdfBase2">—</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
+                <span style="color:#7f8c8d;">IVA (21%)</span><span id="pdfIva2">—</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; font-weight:bold; font-size:1.05em;">
+                <span>TOTAL</span><span id="pdfTotal2">—</span>
+            </div>
+        </div>
+        <div id="pdfNotas" style="margin-top:24px; font-size:0.82em; color:#7f8c8d; border-top:1px solid #eee; padding-top:12px;"></div>
+        <div style="margin-top:32px; font-size:0.78em; color:#aaa; text-align:center;">
+            Este presupuesto tiene una validez de 30 días desde la fecha de emisión.
+        </div>
+    </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/presupuestos.js"></script>
+</body>
+</html>

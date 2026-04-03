@@ -33,7 +33,7 @@
         .hub-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
         .hub-card.contabilidad { border-color: #27ae60; }
         .hub-card.facturas     { border-color: #3498db; }
-        .hub-card.presupuestos { border-color: #9b59b6; opacity: 0.6; cursor: not-allowed; }
+        .hub-card.presupuestos { border-color: #9b59b6; }
 
         .hub-card .icon  { font-size: 2.8em; margin-bottom: 14px; }
         .hub-card h2     { font-size: 1.15em; color: #2c3e50; margin-bottom: 8px; }
@@ -74,12 +74,11 @@
             <p>Órdenes de trabajo, materiales, clientes y facturación</p>
         </a>
 
-        <div class="hub-card presupuestos" onclick="return false;">
+        <a class="hub-card presupuestos" href="/presupuestos">
             <div class="icon">📋</div>
             <h2>Presupuestos</h2>
             <p>Generación y seguimiento de presupuestos para clientes</p>
-            <span class="badge">Próximamente</span>
-        </div>
+        </a>
     </div>
 
     <script>

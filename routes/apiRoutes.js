@@ -12,7 +12,8 @@ const facturaController   = require('../controllers/facturaController');
 const gastosController    = require('../controllers/gastosController');
 const iaController        = require('../controllers/iaController');
 const logController            = require('../controllers/logController');
-const contabilidadController   = require('../controllers/contabilidadController');
+const contabilidadController    = require('../controllers/contabilidadController');
+const presupuestosController    = require('../controllers/presupuestosController');
 
 // ============================================================
 // USUARIOS
@@ -78,6 +79,17 @@ router.post  ('/ia/escanear-ticket', autenticado, iaController.escanearTicket);
 // CONTABILIDAD
 // ============================================================
 router.get   ('/contabilidad/resumen', autenticado, contabilidadController.getResumen);
+
+// ============================================================
+// PRESUPUESTOS
+// ============================================================
+router.get   ('/presupuestos',              autenticado,    presupuestosController.getAll);
+router.post  ('/presupuestos',              autenticado,    presupuestosController.crear);
+router.put   ('/presupuestos/:id',          soloAdmin,      presupuestosController.editar);
+router.put   ('/presupuestos/:id/estado',   autenticado,    presupuestosController.cambiarEstado);
+router.delete('/presupuestos/:id',          soloAdmin,      presupuestosController.eliminar);
+router.post  ('/presupuestos/:id/convertir',soloAdmin,      presupuestosController.convertirAOT);
+router.post  ('/presupuestos/:id/email',    soloAdmin,      presupuestosController.enviarEmail);
 
 router.get   ('/logs',            soloAdmin,   logController.getAll);
 router.put   ('/logs/:id',        autenticado, logController.editar);

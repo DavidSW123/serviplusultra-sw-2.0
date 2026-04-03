@@ -91,6 +91,22 @@ async function inicializarDB() {
             fecha      TEXT
         )`);
 
+        await db.execute(`CREATE TABLE IF NOT EXISTS presupuestos (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            referencia       TEXT UNIQUE NOT NULL,
+            cliente_id       INTEGER,
+            descripcion      TEXT,
+            lineas           TEXT,
+            base_imponible   REAL DEFAULT 0,
+            iva              REAL DEFAULT 0,
+            total            REAL DEFAULT 0,
+            estado           TEXT DEFAULT 'BORRADOR',
+            fecha_creacion   TEXT,
+            fecha_envio      TEXT,
+            notas            TEXT,
+            FOREIGN KEY (cliente_id) REFERENCES clientes (id)
+        )`);
+
         // --- MIGRACIONES SEGURAS (idempotentes) ---
         const migraciones = [
             `ALTER TABLE ordenes_trabajo ADD COLUMN cliente_id INTEGER`,
