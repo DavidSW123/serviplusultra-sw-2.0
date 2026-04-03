@@ -95,7 +95,8 @@ async function inicializarDB() {
         const migraciones = [
             `ALTER TABLE ordenes_trabajo ADD COLUMN cliente_id INTEGER`,
             `ALTER TABLE ordenes_trabajo ADD COLUMN tecnicos_nombres TEXT DEFAULT ''`,
-            `ALTER TABLE gastos_socios ADD COLUMN implicados TEXT DEFAULT 'Giancarlo,David,Kevin'`
+            `ALTER TABLE gastos_socios ADD COLUMN implicados TEXT DEFAULT 'Giancarlo,David,Kevin'`,
+            `UPDATE usuarios SET rol = 'admin' WHERE username = 'David' AND rol = 'director'`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }
