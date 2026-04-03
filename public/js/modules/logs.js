@@ -33,29 +33,51 @@ function abrirLogs() {
     });
 }
 
-function _renderDetalleLog(log) {
-    let html = `<div style="font-size:0.9em;">
-        <strong>📋 Detalle completo del registro</strong><br><br>
-        <table style="width:100%; border-collapse:collapse; font-size:0.95em;">
-            <tr><td style="padding:4px 10px; color:#7f8c8d; width:120px;">ID</td><td>${log.id}</td></tr>
-            <tr><td style="padding:4px 10px; color:#7f8c8d;">Fecha</td><td>${log.fecha}</td></tr>
-            <tr><td style="padding:4px 10px; color:#7f8c8d;">Usuario</td><td>${log.usuario}</td></tr>
-            <tr><td style="padding:4px 10px; color:#7f8c8d;">Acción</td><td>${log.accion}</td></tr>
-            <tr><td style="padding:4px 10px; color:#7f8c8d;">Referencia</td><td>${log.referencia}</td></tr>
-            <tr><td style="padding:4px 10px; color:#7f8c8d;">Estado</td><td>${log.estado}</td></tr>`;
+function _textoHumano(log) {
+    let d = {};
+    try { d = typeof log.datos === 'string' ? JSON.parse(log.datos) : (log.datos || {}); } catch { return null; }
 
-    if (log.datos) {
-        try {
-            const datos = typeof log.datos === 'string' ? JSON.parse(log.datos) : log.datos;
-            html += `<tr><td style="padding:4px 10px; color:#7f8c8d; vertical-align:top;">Datos</td>
-                <td><pre style="margin:0; background:#fff; padding:8px; border-radius:4px; border:1px solid #ddd; font-size:0.85em; overflow-x:auto;">${JSON.stringify(datos, null, 2)}</pre></td></tr>`;
-        } catch {
-            html += `<tr><td style="padding:4px 10px; color:#7f8c8d;">Datos</td><td>${log.datos}</td></tr>`;
-        }
+    const accion = log.accion;
+
+    if (accion === 'Añadir OT') {
+        const tecns = d.tecnicos_nombres || 'sin asignar';
+        const horas = d.horas ? `${d.horas} h` : '—';
+        const mat   = d.materiales_precio > 0 ? ` Se añadieron materiales por ${parseFloat(d.materiales_precio).toFixed(2)} €.` : '';
+        return `${log.usuario} solicitó crear la orden <strong>${d.codigo_ot}</strong> para ${tecns}, con ${horas} de trabajo en "${d.marca}".${mat}`;
     }
 
-    html += '</table></div>';
-    return html;
+    if (accion === 'Eliminar OT') {
+        return `${log.usuario} solicitó <strong>eliminar</strong> la orden con referencia "${log.referencia}".`;
+    }
+
+    if (accion === 'Editar OT') {
+        if (d.nuevoEstado) return `${log.usuario} cambió el estado de la orden a <strong>${d.nuevoEstado}</strong>.`;
+        const campos = [];
+        if (d.horas)            campos.push(`horas: ${d.horas}`);
+        if (d.marca)            campos.push(`descripción: "${d.marca}"`);
+        if (d.tipo_urgencia)    campos.push(`urgencia: ${d.tipo_urgencia}`);
+        if (d.tecnicos_nombres) campos.push(`técnicos: ${d.tecnicos_nombres}`);
+        return `${log.usuario} modificó la orden <strong>${d.codigo_ot || log.referencia}</strong>` +
+               (campos.length ? ` — ${campos.join(', ')}.` : '.');
+    }
+
+    if (accion === 'Eliminar OT') {
+        return `${log.usuario} eliminó la orden "${log.referencia}".`;
+    }
+
+    // Fallback genérico legible
+    const pares = Object.entries(d)
+        .filter(([k]) => !['imagen', 'logo', 'lineas_materiales'].includes(k))
+        .map(([k, v]) => `${k}: ${v}`).join(' · ');
+    return pares || null;
+}
+
+function _renderDetalleLog(log) {
+    const texto = _textoHumano(log);
+    return `<div style="font-size:0.9em; padding:5px 0;">
+        <span style="font-size:1.1em;">${texto || 'Sin detalles adicionales.'}</span>
+        <br><small style="color:#aaa; margin-top:6px; display:block;">${log.fecha} · ID #${log.id}</small>
+    </div>`;
 }
 
 function toggleDetalleLog(id) {
