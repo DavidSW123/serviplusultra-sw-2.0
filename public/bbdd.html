@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base de Datos OTs - ServiPlusUltra</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="/css/bbdd.css">
+</head>
+<body>
+
+    <div class="container">
+        <div style="text-align: right; margin-bottom: 10px; color: #555; font-size: 0.9em;">
+            <span id="infoUsuarioBBDD"></span>
+        </div>
+
+        <div class="cabecera">
+            <h1 style="margin: 0;">🗄️ Visor de Base de Datos</h1>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-excel" onclick="exportarExcel()">📊 Exportar a Excel</button>
+                <a href="/" class="btn btn-volver">🔙 Volver al Inicio</a>
+            </div>
+        </div>
+
+        <div class="filtros-container">
+            <div class="filtros">
+                <input type="text" id="filtroOT" placeholder="🔍 Código OT..." onkeyup="filtrarTabla()">
+                <input type="text" id="filtroMarca" placeholder="🔍 Marca/Desc..." onkeyup="filtrarTabla()">
+                
+                <select id="filtroEstado" onchange="filtrarTabla()">
+                    <option value="TODOS">Todos los Estados</option>
+                    <option value="PENDIENTE">Pendientes</option>
+                    <option value="HECHO">Hechos</option>
+                    <option value="ANULADO">Anulados</option>
+                </select>
+
+                <select id="filtroCliente" onchange="filtrarTabla()">
+                    <option value="TODOS">Todos los Clientes</option>
+                </select>
+
+                <div class="filtros-grupo-fecha">
+                    <span style="font-size: 0.9em; color: #7f8c8d; font-weight: bold;">📅 Rango:</span>
+                    <input type="date" id="filtroFechaInicio" onchange="filtrarTabla()" title="Fecha Desde">
+                    <span style="color: #ccc;">-</span>
+                    <input type="date" id="filtroFechaFin" onchange="filtrarTabla()" title="Fecha Hasta">
+                </div>
+
+                <button class="btn btn-limpiar" onclick="borrarFiltros()" title="Restablecer todos los filtros">✖️ Limpiar Filtros</button>
+            </div>
+        </div>
+
+        <table id="tablaBBDD">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Código OT</th>
+                    <th>Cliente</th>
+                    <th>Marca</th>
+                    <th>Fecha Encargo</th>
+                    <th>Urgencia</th>
+                    <th>Horas</th>
+                    <th>Técnicos</th>
+                    <th>Materiales (€)</th>
+                    <th>Estado</th>
+                    <th id="colAcciones">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpoTabla">
+                <tr><td colspan="11" style="text-align:center;">Cargando datos desde la nube...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="modalEditarOT" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="cerrarModal('modalEditarOT')">&times;</span>
+            <h2 style="margin-top:0; color:#f39c12;">✏️ Editar Orden de Trabajo</h2>
+            <form id="formEditarOTDirecto">
+                <div class="grid-2">
+                    <div class="form-group"><label>Código de OT</label><input type="text" id="ed_codigo_ot" required></div>
+                    <div class="form-group"><label>Cliente</label><select id="ed_ot_cliente_id"><option value="">-- Sin asignar --</option></select></div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Fecha encargo</label><input type="datetime-local" id="ed_fecha_encargo" required></div>
+                    <div class="form-group"><label>Finalización</label><input type="datetime-local" id="ed_fecha_completada"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Horas</label><input type="number" step="0.1" id="ed_horas" required></div>
+                    <div class="form-group"><label>Técnicos</label>
+                        <div style="display:flex; gap:10px;"><select id="ed_selTecnicosAdd" style="flex-grow:1;"><option value="">-- Seleccionar --</option></select><button type="button" class="btn-secundario" style="margin:0; padding:10px;" onclick="agregarEdTecnicoOT()">Añadir</button></div>
+                        <div id="ed_listaTecnicosOT" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div>
+                    </div>
+                </div>
+                <div class="form-group"><label>Marca</label><input type="text" id="ed_marca" required></div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Urgencia</label><select id="ed_tipo_urgencia"><option value="Verde">🟢 Verde</option><option value="Amarillo">🟡 Amarillo</option><option value="Rojo">🔴 Rojo</option></select></div>
+                    <div class="form-group"><label>Materiales (€)</label><input type="number" step="0.01" id="ed_materiales_precio" required></div>
+                </div>
+                <button type="button" class="btn-save" onclick="guardarEdicionOT()">💾 Sobrescribir Cambios</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/bbdd.js"></script>
+</body>
+</html>

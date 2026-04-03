@@ -1,0 +1,255 @@
+const sesionStr = localStorage.getItem('sesionPlusUltra');
+if (!sesionStr) window.location.href = '/login';
+const sesion = JSON.parse(sesionStr);
+const imgDefecto = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
+const imgClienteDef = "https://cdn-icons-png.flaticon.com/512/3135/3135768.png";
+
+let otsGlobal = [], logsGlobal = [], clientesGlobal = [], lineasFactura = [], stockGlobal = [];
+let arrayLineasMat = [], counterLineas = 0, modoEdicionOT = null;
+let otActualId = null, otActualCodigo = '';
+let tecnicosSeleccionados = [], e_tecnicosSeleccionados = [], ed_tecnicosSeleccionados = [];
+const headersSeguridad = { 'Content-Type': 'application/json', 'x-rol': sesion.rol, 'x-user': sesion.username };
+const prefijoAnoActual = `OT${new Date().getFullYear().toString().slice(-2)}/`;
+
+// ── UI ───────────────────────────────────────────────────────
+
+function inicializarUI() {
+    document.getElementById('topNombre').innerText = sesion.username;
+    document.getElementById('topRol').innerText = sesion.rol;
+    document.getElementById('menuNombre').innerText = sesion.username;
+    document.getElementById('menuRol').innerText = sesion.rol;
+    document.getElementById('topAvatar').src = sesion.foto || imgDefecto;
+    document.getElementById('codigo_ot').placeholder = `${prefijoAnoActual}00001`;
+
+    if (sesion.rol === 'admin' || sesion.rol === 'director') {
+        document.getElementById('menuGastosArea').style.display = 'block';
+        document.getElementById('menuClientesArea').style.display = 'block';
+        document.getElementById('btnCrearTecnicoArea').innerHTML = `<button class="btn-side" onclick="abrirModal('modalTecnico')">👷 Crear Perfil Técnico</button>`;
+        document.getElementById('btnLogsArea').innerHTML = `<button class="btn-side" style="background-color: #f39c12; margin-top: 20px;" onclick="abrirLogs()">📝 Registro de Auditoría</button>`;
+        if (['Giancarlo', 'David', 'Kevin'].includes(sesion.username)) {
+            document.getElementById('g_pagador').value = sesion.username;
+            document.getElementById('p_emisor').value = sesion.username;
+        }
+    }
+    if (sesion.rol === 'admin') document.getElementById('menuSolicitudesArea').innerHTML = `<button class="btn-side" style="background: #e67e22;" onclick="abrirSolicitudesClientes()">🔔 Solicitudes Nuevos Clientes</button>`;
+    if (sesion.rol === 'director') {
+        document.getElementById('btnGuardarMain').innerText = "Enviar OT a Revisión (Standby)";
+        document.getElementById('btnGuardarCliente').innerText = "Enviar Cliente a Revisión";
+    }
+    cargarUsuariosParaOT();
+    cargarStock();
+}
+
+function comprimirImagen(file, callback) {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 800;
+            const scaleSize = MAX_WIDTH / img.width;
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scaleSize;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            callback(canvas.toDataURL('image/jpeg', 0.6));
+        };
+    };
+}
+
+function abrirMenuLateral() { document.getElementById('sideMenu').classList.add('open'); document.getElementById('overlayMenu').style.display = 'block'; }
+function cerrarMenuLateral() { document.getElementById('sideMenu').classList.remove('open'); document.getElementById('overlayMenu').style.display = 'none'; }
+function cerrarSesion() { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; }
+function abrirModal(id) { document.getElementById(id).style.display = 'block'; cerrarMenuLateral(); }
+function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+function probarEnvioCorreo() { const email = prompt("Introduce tu correo para la prueba:"); if (!email) return; alert("⏳ Enviando..."); fetch('/api/test-email', { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ emailDestino: email }) }).then(r => r.json()).then(data => { if (data.error) alert("❌ " + data.error); else alert("✅ " + data.mensaje); }).catch(() => alert("❌ Error.")); }
+
+// ── TÉCNICOS ─────────────────────────────────────────────────
+
+function cargarUsuariosParaOT() {
+    fetch('/api/usuarios/nombres', { headers: headersSeguridad }).then(res => res.json()).then(data => {
+        const s1 = document.getElementById('selTecnicosAdd');
+        const s2 = document.getElementById('e_selTecnicosAdd');
+        const s3 = document.getElementById('ed_selTecnicosAdd');
+        s1.innerHTML = '<option value="">-- Seleccionar --</option>';
+        s2.innerHTML = '<option value="">-- Seleccionar --</option>';
+        if (s3) s3.innerHTML = '<option value="">-- Seleccionar --</option>';
+        data.forEach(u => {
+            const opt = `<option value="${u.username}">${u.username} (${u.rol})</option>`;
+            s1.innerHTML += opt; s2.innerHTML += opt; if (s3) s3.innerHTML += opt;
+        });
+    });
+}
+function agregarTecnicoOT() { const s = document.getElementById('selTecnicosAdd'); if (s.value && !tecnicosSeleccionados.includes(s.value)) { tecnicosSeleccionados.push(s.value); renderizarTecnicosOT(); } s.value = ""; }
+function quitarTecnicoOT(nombre) { tecnicosSeleccionados = tecnicosSeleccionados.filter(t => t !== nombre); renderizarTecnicosOT(); }
+function renderizarTecnicosOT() { const d = document.getElementById('listaTecnicosOT'); d.innerHTML = ''; tecnicosSeleccionados.forEach(t => d.innerHTML += `<div class="tecnico-badge">👤 ${t} <span onclick="quitarTecnicoOT('${t}')">&times;</span></div>`); }
+
+function agregarETecnicoOT() { const s = document.getElementById('e_selTecnicosAdd'); if (s.value && !e_tecnicosSeleccionados.includes(s.value)) { e_tecnicosSeleccionados.push(s.value); renderizarETecnicosOT(); } s.value = ""; }
+function quitarETecnicoOT(nombre) { e_tecnicosSeleccionados = e_tecnicosSeleccionados.filter(t => t !== nombre); renderizarETecnicosOT(); }
+function renderizarETecnicosOT() { const d = document.getElementById('e_listaTecnicosOT'); d.innerHTML = ''; e_tecnicosSeleccionados.forEach(t => d.innerHTML += `<div class="tecnico-badge">👤 ${t} <span onclick="quitarETecnicoOT('${t}')">&times;</span></div>`); }
+
+function agregarEdTecnicoOT() { const s = document.getElementById('ed_selTecnicosAdd'); if (s.value && !ed_tecnicosSeleccionados.includes(s.value)) { ed_tecnicosSeleccionados.push(s.value); renderizarEdTecnicosOT(); } s.value = ""; }
+function quitarEdTecnicoOT(nombre) { ed_tecnicosSeleccionados = ed_tecnicosSeleccionados.filter(t => t !== nombre); renderizarEdTecnicosOT(); }
+function renderizarEdTecnicosOT() { const d = document.getElementById('ed_listaTecnicosOT'); d.innerHTML = ''; ed_tecnicosSeleccionados.forEach(t => d.innerHTML += `<div class="tecnico-badge">👤 ${t} <span onclick="quitarEdTecnicoOT('${t}')">&times;</span></div>`); }
+
+function validarFormulario(codigo, fechaIn, fechaOut) { if (!codigo.startsWith(prefijoAnoActual)) { alert(`❌ Debe empezar por ${prefijoAnoActual}`); return false; } if (fechaOut && new Date(fechaOut) <= new Date(fechaIn)) { alert(`❌ Finalización posterior a inicio.`); return false; } return true; }
+
+// ── ESCÁNER IA ───────────────────────────────────────────────
+
+function abrirEscanerIA() {
+    cerrarModal('modalTickets');
+    document.getElementById('ia_loading').style.display = 'none';
+    document.getElementById('ia_file').value = '';
+    abrirModal('modalEscanerIA');
+}
+
+function ejecutarEscaneoIA(input) {
+    if (!input.files[0]) return;
+    const loading = document.getElementById('ia_loading');
+    loading.style.display = 'block';
+
+    comprimirImagen(input.files[0], (b64) => {
+        fetch('/api/ia/escanear-ticket', { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ imagenBase64: b64 }) })
+        .then(r => r.json())
+        .then(data => {
+            loading.style.display = 'none';
+            if (data.error) { alert("❌ Error de IA: " + data.error); return; }
+            alert("✅ ¡Ticket leído por Inteligencia Artificial!");
+            cerrarModal('modalEscanerIA');
+            modoEdicionOT = otActualId;
+            arrayLineasMat = [];
+            document.getElementById('contenedorLineasMat').innerHTML = '';
+            document.getElementById('totalMaterialesCalc').innerText = '0.00';
+            if (data.lineas && data.lineas.length > 0) {
+                data.lineas.forEach(linea => {
+                    const idLinea = counterLineas++;
+                    arrayLineasMat.push({ id: idLinea, is_stock: false, stock_id: '', descripcion: linea.descripcion || 'Material IA', cantidad: linea.cantidad || 1, precio: (linea.precio / (linea.cantidad || 1)).toFixed(2), importe: linea.precio || 0, imagen: b64 });
+                });
+            } else { addLineaMaterial(); }
+            renderizarLineasMateriales();
+            abrirModal('modalLineasMateriales');
+            let total = arrayLineasMat.reduce((acc, curr) => acc + curr.importe, 0);
+            document.getElementById('totalMaterialesCalc').innerText = total.toFixed(2);
+        })
+        .catch(() => { loading.style.display = 'none'; alert("❌ Fallo de conexión con la IA."); });
+    });
+}
+
+// ── MATERIALES Y STOCK ───────────────────────────────────────
+
+function preguntarMateriales(e) { e.preventDefault(); modoEdicionOT = null; if (tecnicosSeleccionados.length === 0) { alert("❌ Debes asignar al menos a un técnico."); return; } const codigo = document.getElementById('codigo_ot').value; const fechaEn = document.getElementById('fecha_encargo').value; const fechaCo = document.getElementById('fecha_completada').value; if (!validarFormulario(codigo, fechaEn, fechaCo)) return; abrirModal('modalPreguntaMateriales'); }
+function abrirEditorMateriales() { cerrarModal('modalPreguntaMateriales'); arrayLineasMat = []; document.getElementById('contenedorLineasMat').innerHTML = ''; document.getElementById('totalMaterialesCalc').innerText = '0.00'; addLineaMaterial(); abrirModal('modalLineasMateriales'); }
+function abrirGestorMaterialesDesdeEdicion() { cerrarModal('modalEditarOT'); abrirTicketsOT(otActualId, document.getElementById('ed_codigo_ot').value); }
+function abrirGestorMaterialesEdicion() { cerrarModal('modalTickets'); modoEdicionOT = otActualId; arrayLineasMat = []; document.getElementById('contenedorLineasMat').innerHTML = ''; document.getElementById('totalMaterialesCalc').innerText = '0.00'; addLineaMaterial(); abrirModal('modalLineasMateriales'); }
+function addLineaMaterial() { const idLinea = counterLineas++; arrayLineasMat.push({ id: idLinea, is_stock: false, stock_id: '', descripcion: '', cantidad: 1, precio: 0, importe: 0, imagen: '' }); renderizarLineasMateriales(); }
+function borrarLineaMaterial(id) { arrayLineasMat = arrayLineasMat.filter(l => l.id !== id); renderizarLineasMateriales(); }
+function onChangeLinea(id, campo, valor) { let linea = arrayLineasMat.find(l => l.id === id); if (!linea) return; if (campo === 'is_stock') { linea.is_stock = valor; linea.descripcion = ''; linea.stock_id = ''; linea.precio = 0; linea.imagen = ''; } else if (campo === 'stock_id') { linea.stock_id = valor; let sItem = stockGlobal.find(s => s.id == valor); if (sItem) { linea.descripcion = sItem.descripcion; linea.precio = sItem.precio_unidad; } } else { linea[campo] = (campo === 'cantidad' || campo === 'precio') ? parseFloat(valor) || 0 : valor; } linea.importe = linea.cantidad * linea.precio; let total = arrayLineasMat.reduce((acc, curr) => acc + curr.importe, 0); document.getElementById('totalMaterialesCalc').innerText = total.toFixed(2); if (campo === 'is_stock' || campo === 'stock_id') renderizarLineasMateriales(); }
+function handleFileSelect(id, fileInput) { if (!fileInput.files[0]) return; comprimirImagen(fileInput.files[0], (b64) => { let linea = arrayLineasMat.find(l => l.id === id); if (linea) { linea.imagen = b64; alert('✅ Foto guardada en la línea'); } }); }
+
+function renderizarLineasMateriales() {
+    const cont = document.getElementById('contenedorLineasMat');
+    cont.innerHTML = '';
+    arrayLineasMat.forEach(l => {
+        let opcionesStock = '<option value="">-- Elige del almacén --</option>';
+        stockGlobal.forEach(s => { if (s.cantidad > 0) opcionesStock += `<option value="${s.id}">${s.descripcion} (${s.cantidad} disp.)</option>`; });
+        let htmlDesc = l.is_stock ? `<select onchange="onChangeLinea(${l.id}, 'stock_id', this.value)" required>${opcionesStock}</select>` : `<input type="text" placeholder="Ej: Rollo Cable..." value="${l.descripcion}" oninput="onChangeLinea(${l.id}, 'descripcion', this.value)" required>`;
+        let htmlFoto = l.is_stock ? `<small style="color:#27ae60; font-weight:bold;">Stock descontado auto.</small>` : `<input type="file" accept="image/*" capture="environment" onchange="handleFileSelect(${l.id}, this)">`;
+        let extraImg = l.imagen && !l.is_stock ? `<br><small style="color:#8e44ad;">📸 Ticket IA / Foto adjunta</small>` : '';
+        cont.innerHTML += `<div class="linea-mat"><button class="eliminar-linea" onclick="borrarLineaMaterial(${l.id})">X</button><div style="margin-bottom: 10px;"><label style="display:inline-flex; align-items:center; gap:5px; font-weight:normal; cursor:pointer;"><input type="checkbox" ${l.is_stock ? 'checked' : ''} onchange="onChangeLinea(${l.id}, 'is_stock', this.checked)"> Usar material existente del Stock</label></div><div class="grid-linea"><div><label>Descripción</label>${htmlDesc}</div><div><label>Cant.</label><input type="number" step="0.01" value="${l.cantidad}" oninput="onChangeLinea(${l.id}, 'cantidad', this.value); document.getElementById('tot_${l.id}').innerText = (this.value*${l.precio}).toFixed(2)" required></div><div><label>Precio/U (€)</label><input type="number" step="0.01" value="${l.precio}" ${l.is_stock ? 'readonly' : ''} oninput="onChangeLinea(${l.id}, 'precio', this.value); document.getElementById('tot_${l.id}').innerText = (this.value*${l.cantidad}).toFixed(2)" required></div><div><label>Total (€)</label><strong id="tot_${l.id}">${l.importe.toFixed(2)}</strong></div></div><div style="margin-top: 10px;">${htmlFoto} ${extraImg}</div></div>`;
+        if (l.is_stock && l.stock_id) { setTimeout(() => { let selects = cont.querySelectorAll('select'); selects[selects.length - 1].value = l.stock_id; }, 10); }
+    });
+}
+
+function guardarOTFinal(tieneMateriales) {
+    if (modoEdicionOT) {
+        if (!tieneMateriales) { cerrarModal('modalPreguntaMateriales'); return; }
+        if (arrayLineasMat.length === 0) { alert("❌ No hay líneas."); return; }
+        for (let l of arrayLineasMat) { if (l.is_stock && !l.stock_id) { alert("❌ Elige un material del stock."); return; } if (!l.is_stock && !l.descripcion) { alert("❌ Pon descripción en las líneas."); return; } }
+        fetch(`/api/ot/${modoEdicionOT}/lineas_materiales`, { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ lineas_materiales: arrayLineasMat }) }).then(r => r.json()).then(data => { if (data.error) alert("❌ " + data.error); else { alert("✅ " + data.mensaje); cerrarModal('modalLineasMateriales'); cargarOTs(); cargarStock(); abrirTicketsOT(otActualId, otActualCodigo); } });
+        return;
+    }
+    if (tieneMateriales) { if (arrayLineasMat.length === 0) { alert("❌ No hay líneas de materiales."); return; } for (let l of arrayLineasMat) { if (l.is_stock && !l.stock_id) { alert("❌ Elige un material del stock."); return; } if (!l.is_stock && !l.descripcion) { alert("❌ Pon descripción en las líneas."); return; } } } else { arrayLineasMat = []; cerrarModal('modalPreguntaMateriales'); }
+    const datos = { codigo_ot: document.getElementById('codigo_ot').value, fecha_encargo: document.getElementById('fecha_encargo').value, fecha_completada: document.getElementById('fecha_completada').value, horas: parseFloat(document.getElementById('horas').value), num_tecnicos: tecnicosSeleccionados.length, tecnicos_nombres: tecnicosSeleccionados.join(', '), marca: document.getElementById('marca').value, tipo_urgencia: document.getElementById('tipo_urgencia').value, cliente_id: document.getElementById('ot_cliente_id').value || null, lineas_materiales: arrayLineasMat };
+    fetch('/api/ot', { method: 'POST', headers: headersSeguridad, body: JSON.stringify(datos) }).then(res => res.json()).then(data => { if (data.error) alert("❌ " + data.error); else { alert("ℹ️ " + data.mensaje); document.getElementById('formOT').reset(); tecnicosSeleccionados = []; renderizarTecnicosOT(); if (tieneMateriales) cerrarModal('modalLineasMateriales'); cargarOTs(); cargarStock(); } });
+}
+
+function cargarStock() { fetch('/api/stock', { headers: headersSeguridad }).then(res => res.json()).then(data => { stockGlobal = data; const tbody = document.getElementById('tablaStockBody'); if (tbody) { tbody.innerHTML = ''; if (data.length === 0) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">El almacén está vacío.</td></tr>'; data.forEach(s => { let icon = s.imagen ? `<a href="${s.imagen}" target="_blank" title="Ver Ticket">📄</a>` : '-'; let rowClass = s.cantidad <= 0 ? 'background:#fdedec; color:#e74c3c;' : ''; tbody.innerHTML += `<tr style="${rowClass}"><td><strong>${s.descripcion}</strong></td><td>${s.cantidad} uds</td><td>${s.precio_unidad.toFixed(2)} €</td><td style="text-align:center; font-size:1.2em;">${icon}</td></tr>`; }); } }); }
+function abrirModuloStock() { cargarStock(); abrirModal('modalStock'); }
+
+document.getElementById('formStock').addEventListener('submit', function(e) { e.preventDefault(); const desc = document.getElementById('s_desc').value; const cant = document.getElementById('s_cant').value; const precio = document.getElementById('s_precio').value; const file = document.getElementById('s_file').files[0]; let pUnitario = parseFloat(precio) / parseFloat(cant); const enviar = (imgB64) => { fetch('/api/stock', { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ descripcion: desc, cantidad: cant, precio_unidad: pUnitario.toFixed(2), imagen: imgB64 }) }).then(r => r.json()).then(d => { if (d.error) alert("❌ " + d.error); else { alert("✅ " + d.mensaje); document.getElementById('formStock').reset(); cargarStock(); } }); }; if (file) comprimirImagen(file, enviar); else enviar(''); });
+
+// ── CLIENTES ─────────────────────────────────────────────────
+
+function cargarClientes() { fetch('/api/clientes', { headers: headersSeguridad }).then(res => res.json()).then(data => { clientesGlobal = data; const cAprobados = data.filter(c => c.estado === 'APROBADO'); const selOt = document.getElementById('ot_cliente_id'); selOt.innerHTML = '<option value="">-- Sin asignar / General --</option>'; const selFact = document.getElementById('selClienteFactura'); selFact.innerHTML = '<option value="">-- Seleccionar Cliente --</option>'; const selEdOt = document.getElementById('ed_ot_cliente_id'); if (selEdOt) selEdOt.innerHTML = '<option value="">-- Sin asignar / General --</option>'; cAprobados.forEach(c => { selOt.innerHTML += `<option value="${c.id}">${c.nombre}</option>`; selFact.innerHTML += `<option value="${c.id}">${c.nombre}</option>`; if (selEdOt) selEdOt.innerHTML += `<option value="${c.id}">${c.nombre}</option>`; }); }); }
+function renderizarBurbujasClientes() { const grid = document.getElementById('gridClientes'); grid.innerHTML = ''; const aprobados = clientesGlobal.filter(c => c.estado === 'APROBADO'); if (aprobados.length === 0) grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">Aún no hay clientes.</p>'; aprobados.forEach(c => grid.innerHTML += `<div class="cliente-bubble" onclick="abrirDetalleCliente(${c.id})"><img src="${c.logo || imgClienteDef}" class="bubble-img"><div class="bubble-name">${c.nombre}</div></div>`); }
+function abrirDetalleCliente(id) { const c = clientesGlobal.find(x => x.id === id); document.getElementById('d_c_logo').src = c.logo || imgClienteDef; document.getElementById('d_c_nombre').innerText = c.nombre; document.getElementById('d_c_nif').innerText = c.nif; document.getElementById('d_c_direccion').innerText = c.direccion; document.getElementById('d_c_tel').innerText = c.telefono || '-'; document.getElementById('d_c_email').innerText = c.email || '-'; const divAcciones = document.getElementById('d_c_acciones'); divAcciones.innerHTML = ''; if (sesion.rol === 'admin') { divAcciones.innerHTML = `<button class="btn-editar" onclick="abrirModalEditarCliente(${id})">✏️ Editar Datos</button>`; } const ots = otsGlobal.filter(ot => ot.cliente_id === id); const divOts = document.getElementById('d_c_ots'); divOts.innerHTML = ''; if (ots.length === 0) divOts.innerHTML = '<p>No hay OTs para este cliente.</p>'; ots.forEach(ot => { let color = ot.estado === 'HECHO' ? '#27ae60' : (ot.estado === 'PENDIENTE' ? '#f39c12' : '#e74c3c'); divOts.innerHTML += `<div style="border-left: 4px solid ${color}; padding: 10px; background: #fff; margin-bottom: 8px;"><strong>${ot.codigo_ot}</strong> - ${ot.marca} <span style="float:right; color:${color};">${ot.estado}</span></div>`; }); cerrarModal('modalClientes'); abrirModal('modalDetalleCliente'); }
+function abrirModalEditarCliente(id) { const c = clientesGlobal.find(x => x.id === id); document.getElementById('edit_c_id').value = c.id; document.getElementById('edit_c_nombre').value = c.nombre; document.getElementById('edit_c_nif').value = c.nif; document.getElementById('edit_c_direccion').value = c.direccion; document.getElementById('edit_c_telefono').value = c.telefono || ''; document.getElementById('edit_c_email').value = c.email || ''; cerrarModal('modalDetalleCliente'); abrirModal('modalEditarCliente'); }
+document.getElementById('formEditarCliente').addEventListener('submit', function(e) { e.preventDefault(); const id = document.getElementById('edit_c_id').value; const file = document.getElementById('edit_c_logo_file').files[0]; const enviar = (logoB64) => { const payload = { nombre: document.getElementById('edit_c_nombre').value, nif: document.getElementById('edit_c_nif').value, direccion: document.getElementById('edit_c_direccion').value, email: document.getElementById('edit_c_email').value, telefono: document.getElementById('edit_c_telefono').value, logo: logoB64 || clientesGlobal.find(x => x.id == id).logo }; fetch(`/api/clientes/${id}`, { method: 'PUT', headers: headersSeguridad, body: JSON.stringify(payload) }).then(res => res.json()).then(d => { if (d.error) alert("❌ " + d.error); else { alert(d.mensaje); document.getElementById('formEditarCliente').reset(); cerrarModal('modalEditarCliente'); cargarClientes(); abrirModal('modalClientes'); setTimeout(renderizarBurbujasClientes, 500); } }); }; if (file) comprimirImagen(file, enviar); else enviar(''); });
+document.getElementById('formCliente').addEventListener('submit', function(e) { e.preventDefault(); const file = document.getElementById('c_logo_file').files[0]; const enviar = (logoB64) => { fetch('/api/clientes', { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ nombre: document.getElementById('c_nombre').value, nif: document.getElementById('c_nif').value, direccion: document.getElementById('c_direccion').value, email: document.getElementById('c_email').value, telefono: document.getElementById('c_telefono').value, logo: logoB64 }) }).then(res => res.json()).then(d => { alert("ℹ️ " + d.mensaje); document.getElementById('formCliente').reset(); cerrarModal('modalCrearCliente'); cargarClientes(); }); }; if (file) { comprimirImagen(file, enviar); } else { enviar(''); } });
+function abrirSolicitudesClientes() { const tbody = document.getElementById('tbodySolicitudesClientes'); tbody.innerHTML = ''; const p = clientesGlobal.filter(c => c.estado === 'PENDIENTE'); if (p.length === 0) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay solicitudes</td></tr>'; p.forEach(c => tbody.innerHTML += `<tr><td><strong>${c.nombre}</strong></td><td>${c.nif}</td><td>Director</td><td><button style="background:#27ae60; border:none; color:white; padding:5px; cursor:pointer;" onclick="resolverCliente(${c.id}, 'APROBADO')">✅</button> <button style="background:#e74c3c; border:none; color:white; padding:5px; cursor:pointer;" onclick="resolverCliente(${c.id}, 'RECHAZADO')">❌</button></td></tr>`); abrirModal('modalSolicitudesClientes'); }
+function resolverCliente(id, estado) { fetch(`/api/clientes/${id}/estado`, { method: 'PUT', headers: headersSeguridad, body: JSON.stringify({ estado }) }).then(res => res.json()).then(d => { alert("ℹ️ " + d.mensaje); cargarClientes(); abrirSolicitudesClientes(); }); }
+
+// ── OTs ──────────────────────────────────────────────────────
+
+function cargarOTs() { fetch('/api/ot', { headers: headersSeguridad }).then(res => res.json()).then(ots => { otsGlobal = ots; document.getElementById('contenedorOTs').innerHTML = ''; ots.forEach(ot => { let btnB = sesion.rol === 'tecnico' ? '' : `<button class="btn-peligro" onclick="eliminarOT(${ot.id})">🗑️</button>`; let disable = sesion.rol === 'tecnico' ? 'disabled' : ''; let btnF = ot.estado === 'HECHO' ? `<button class="btn-factura" onclick="abrirGeneradorFactura(${ot.id})">💶 Factura</button>` : ''; let btnE = sesion.rol === 'admin' ? `<button class="btn-editar" onclick="abrirEditarOT(${ot.id})">✏️</button>` : ''; let nC = ot.cliente_id ? (clientesGlobal.find(c => c.id === ot.cliente_id)?.nombre || '') : ''; let sC = nC ? `<br><small style="color:#7f8c8d;">🏢 ${nC}</small>` : ''; let sT = ot.tecnicos_nombres ? `<br><small style="color:#3498db; font-weight:bold;">👷 ${ot.tecnicos_nombres}</small>` : ''; document.getElementById('contenedorOTs').innerHTML += `<div class="ot-card"><div class="ot-info"><strong>${ot.codigo_ot}</strong> - ${ot.marca} ${sC} ${sT}<br><strong style="color:#e67e22;">Materiales/Tickets: ${ot.materiales_precio.toFixed(2)} €</strong></div><div class="actions"><select class="sel-estado ${ot.estado === 'HECHO' ? 'est-hecho' : (ot.estado === 'ANULADO' ? 'est-anulado' : 'est-pendiente')}" ${disable} onchange="cambiarEstado(${ot.id}, this)"><option value="PENDIENTE" ${ot.estado === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option><option value="HECHO" ${ot.estado === 'HECHO' ? 'selected' : ''}>HECHO</option><option value="ANULADO" ${ot.estado === 'ANULADO' ? 'selected' : ''}>ANULADO</option></select><button class="btn-ticket" onclick="abrirTicketsOT(${ot.id}, '${ot.codigo_ot}')">🧾 Materiales / Tickets</button>${btnF} ${btnE} ${btnB}</div></div>`; }); }); }
+function cambiarEstado(id, sel) { fetch(`/api/ot/${id}/estado`, { method: 'PUT', headers: headersSeguridad, body: JSON.stringify({ estado: sel.value }) }).then(res => res.json()).then(d => { alert("ℹ️ " + d.mensaje); cargarOTs(); }); }
+function eliminarOT(id) { if (confirm("¿Solicitar borrado?")) fetch(`/api/ot/${id}`, { method: 'DELETE', headers: headersSeguridad }).then(res => res.json()).then(d => { alert("ℹ️ " + d.mensaje); cargarOTs(); }); }
+function abrirEditarOT(id) { const ot = otsGlobal.find(o => o.id === id); otActualId = id; document.getElementById('ed_codigo_ot').value = ot.codigo_ot; document.getElementById('ed_ot_cliente_id').value = ot.cliente_id || ''; document.getElementById('ed_fecha_encargo').value = ot.fecha_encargo || ''; document.getElementById('ed_fecha_completada').value = ot.fecha_completada || ''; document.getElementById('ed_horas').value = ot.horas; document.getElementById('ed_marca').value = ot.marca; document.getElementById('ed_tipo_urgencia').value = ot.tipo_urgencia; document.getElementById('ed_materiales_texto').innerText = `${ot.materiales_precio.toFixed(2)} €`; ed_tecnicosSeleccionados = ot.tecnicos_nombres ? ot.tecnicos_nombres.split(',').map(t => t.trim()) : []; renderizarEdTecnicosOT(); abrirModal('modalEditarOT'); }
+function guardarEdicionOT() { if (ed_tecnicosSeleccionados.length === 0) { alert("❌ Asigna al menos un técnico."); return; } const datos = { codigo_ot: document.getElementById('ed_codigo_ot').value, cliente_id: document.getElementById('ed_ot_cliente_id').value || null, fecha_encargo: document.getElementById('ed_fecha_encargo').value, fecha_completada: document.getElementById('ed_fecha_completada').value, horas: parseFloat(document.getElementById('ed_horas').value), num_tecnicos: ed_tecnicosSeleccionados.length, tecnicos_nombres: ed_tecnicosSeleccionados.join(', '), marca: document.getElementById('ed_marca').value, tipo_urgencia: document.getElementById('ed_tipo_urgencia').value }; if (!validarFormulario(datos.codigo_ot, datos.fecha_encargo, datos.fecha_completada)) return; fetch(`/api/ot/${otActualId}`, { method: 'PUT', headers: headersSeguridad, body: JSON.stringify(datos) }).then(r => r.json()).then(d => { if (d.error) alert("❌ " + d.error); else { alert(d.mensaje); cerrarModal('modalEditarOT'); cargarOTs(); } }); }
+
+// ── FACTURAS ─────────────────────────────────────────────────
+
+async function abrirGeneradorFactura(id) {
+    const ot = otsGlobal.find(o => o.id === id); otActualId = ot.id; otActualCodigo = ot.codigo_ot;
+    document.getElementById('factOtCode').innerText = ot.codigo_ot; document.getElementById('factFechaHoy').innerText = new Date().toLocaleDateString('es-ES'); document.getElementById('selClienteFactura').value = ot.cliente_id || ""; actualizarInfoClienteFactura();
+    let isUrg = ot.tipo_urgencia === 'Rojo'; let pDesp = isUrg ? 55.00 : 40.00; let pHora = isUrg ? 45.00 : 25.00; let labelTec = ot.num_tecnicos === 1 ? 'técnico' : 'técnicos'; let txtObra = isUrg ? `Mano de Obra URGENTE (${ot.num_tecnicos} ${labelTec} x ${ot.horas} hrs)` : `Mano de Obra (${ot.num_tecnicos} ${labelTec} x ${ot.horas} hrs)`;
+    lineasFactura = [{ concepto: "Desplazamiento", cantidad: 1, precio: pDesp }, { concepto: txtObra, cantidad: ot.horas * ot.num_tecnicos, precio: pHora }];
+    try {
+        const res = await fetch(`/api/ot/${id}/adjuntos`); const adjuntos = await res.json();
+        if (adjuntos.length > 0) { adjuntos.forEach(adj => { if (adj.importe > 0) { let cant = 1; let concepto = adj.descripcion || 'Material / Recambio'; let match = concepto.match(/\(Cant:\s*([\d.]+)\)/i); if (match) { cant = parseFloat(match[1]); concepto = concepto.replace(/\(Cant:\s*[\d.]+\)/i, '').replace(/\[STOCK\]\s*/i, '').trim(); } let pUnitario = cant > 0 ? (adj.importe / cant) : adj.importe; lineasFactura.push({ concepto: concepto, cantidad: cant, precio: pUnitario }); } }); }
+        else if (ot.materiales_precio > 0) { lineasFactura.push({ concepto: "Materiales y repuestos (Sin detallar)", cantidad: 1, precio: ot.materiales_precio }); }
+    } catch (e) { if (ot.materiales_precio > 0) lineasFactura.push({ concepto: "Materiales y repuestos", cantidad: 1, precio: ot.materiales_precio }); }
+    renderizarTablaFactura(); abrirModal('modalFactura');
+}
+
+function actualizarInfoClienteFactura() { const id = document.getElementById('selClienteFactura').value; const divPrintName = document.getElementById('printClienteNombre'); const divInfo = document.getElementById('infoClienteFacturaTexto'); if (!id) { divInfo.innerHTML = ''; divPrintName.innerText = 'Consumidor Final'; return; } const c = clientesGlobal.find(x => x.id == id); divPrintName.innerText = c.nombre; divInfo.innerHTML = `<strong>NIF/CIF:</strong> ${c.nif}<br><strong>Dir:</strong> ${c.direccion}`; }
+function renderizarTablaFactura() { const tbody = document.getElementById('tbodyLineas'); tbody.innerHTML = ''; let baseImponible = 0; lineasFactura.forEach((l, idx) => { const t = l.cantidad * l.precio; baseImponible += t; tbody.innerHTML += `<tr><td><input type="text" value="${l.concepto}" onchange="actualizarLinea(${idx}, 'concepto', this.value)"></td><td><input type="number" step="0.1" value="${l.cantidad}" onchange="actualizarLinea(${idx}, 'cantidad', this.value)"></td><td><input type="number" step="0.01" value="${l.precio}" onchange="actualizarLinea(${idx}, 'precio', this.value)"></td><td style="text-align:right;">${t.toFixed(2)} €</td><td class="no-print"><button class="btn-peligro" onclick="borrarLineaFactura(${idx})">🗑️</button></td></tr>`; }); const iva = baseImponible * 0.21; document.getElementById('factBase').innerText = baseImponible.toFixed(2); document.getElementById('factIva').innerText = iva.toFixed(2); document.getElementById('factTotal').innerText = (baseImponible + iva).toFixed(2); }
+function actualizarLinea(i, c, v) { lineasFactura[i][c] = c === 'concepto' ? v : (parseFloat(v) || 0); renderizarTablaFactura(); }
+function agregarLineaBlanco() { lineasFactura.push({ concepto: "", cantidad: 1, precio: 0.00 }); renderizarTablaFactura(); }
+function borrarLineaFactura(i) { lineasFactura.splice(i, 1); renderizarTablaFactura(); }
+function enviarFacturaAlCliente() { const idCliente = document.getElementById('selClienteFactura').value; if (!idCliente) { alert("❌ Selecciona un cliente primero."); return; } const cliente = clientesGlobal.find(c => c.id == idCliente); if (!cliente.email || !cliente.email.includes("@")) { alert("❌ El cliente no tiene un email válido."); return; } if (!confirm(`¿Enviar PDF a ${cliente.email}?`)) return; alert("⏳ Generando PDF y enviando... esto tomará unos segundos."); const areaFactura = document.getElementById('facturaAreaImpresion'); areaFactura.classList.add('factura-pdf-limpia'); const noPrints = document.querySelectorAll('.no-print'); noPrints.forEach(el => el.style.display = 'none'); document.getElementById('printClienteNombre').style.display = 'block'; const opciones = { margin: 10, filename: `Factura_${otActualCodigo.replace('/', '-')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }; html2pdf().set(opciones).from(areaFactura).outputPdf('datauristring').then(function(pdfDataUrl) { areaFactura.classList.remove('factura-pdf-limpia'); noPrints.forEach(el => el.style.display = ''); document.getElementById('printClienteNombre').style.display = 'none'; const base64Puro = pdfDataUrl.split(',')[1]; fetch('/api/enviar-factura', { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ emailDestino: cliente.email, asunto: `Factura ${otActualCodigo} - ServiPlusUltra`, htmlBody: `<div style="font-family: Arial; padding: 20px;"><h2>Hola, ${cliente.nombre}</h2><p>Adjuntamos la factura de la OT <strong>${otActualCodigo}</strong>.</p></div>`, pdfBase64: base64Puro, nombreArchivo: `Factura_${otActualCodigo.replace('/', '-')}.pdf` }) }).then(r => r.json()).then(data => { if (data.error) alert("❌ " + data.error); else alert("✅ " + data.mensaje); }); }); }
+
+// ── SPLITWISE ────────────────────────────────────────────────
+
+function cambiarTabGastos(tipo) { if (tipo === 'gasto') { document.getElementById('tabGasto').style = "flex-grow: 1; text-align: center; padding:10px; cursor:pointer; border-bottom: 3px solid #1abc9c; font-weight:bold; color:#1abc9c;"; document.getElementById('tabPago').style = "flex-grow: 1; text-align: center; padding:10px; cursor:pointer; color:#7f8c8d;"; document.getElementById('panelGasto').style.display = 'block'; document.getElementById('panelPago').style.display = 'none'; } else { document.getElementById('tabPago').style = "flex-grow: 1; text-align: center; padding:10px; cursor:pointer; border-bottom: 3px solid #3498db; font-weight:bold; color:#3498db;"; document.getElementById('tabGasto').style = "flex-grow: 1; text-align: center; padding:10px; cursor:pointer; color:#7f8c8d;"; document.getElementById('panelPago').style.display = 'block'; document.getElementById('panelGasto').style.display = 'none'; } }
+function abrirGastosSocios() { fetch('/api/gastos', { headers: headersSeguridad }).then(res => res.json()).then(gastos => { renderizarDeudas(gastos); const divHistorial = document.getElementById('listaHistorialGastos'); divHistorial.innerHTML = ''; if (gastos.length === 0) divHistorial.innerHTML = '<p style="text-align:center; padding: 10px; color:#aaa;">No hay gastos registrados aún.</p>'; gastos.forEach(g => { const esPago = g.concepto.startsWith('[PAGO]'); if (esPago) { let receptor = g.implicados || 'Alguien'; divHistorial.innerHTML += `<div class="gasto-item pago-directo"><div><strong>💸 Devolución / Puesta al día</strong> <br> <small style="color:#7f8c8d;">${g.pagador} ➡️ devolvió a ➡️ ${receptor} | ${g.fecha}</small></div><div style="text-align: right;"><strong>${g.importe.toFixed(2)} €</strong><br><button class="btn-peligro" style="padding: 2px 5px; font-size: 0.8em; margin-top: 5px;" onclick="borrarGastoSocio(${g.id})">Borrar</button></div></div>`; } else { let imp = g.implicados ? g.implicados.split(',').join(', ') : 'Todos'; divHistorial.innerHTML += `<div class="gasto-item"><div><strong>🛒 ${g.concepto}</strong> <br> <small style="color:#7f8c8d;">Pagó: ${g.pagador} | Reparto: ${imp} | ${g.fecha}</small></div><div style="text-align: right;"><strong>${g.importe.toFixed(2)} €</strong><br><button class="btn-peligro" style="padding: 2px 5px; font-size: 0.8em; margin-top: 5px;" onclick="borrarGastoSocio(${g.id})">Borrar</button></div></div>`; } }); abrirModal('modalGastos'); }); }
+function renderizarDeudas(gastos) { const socios = ['Giancarlo', 'David', 'Kevin']; let balances = { Giancarlo: 0, David: 0, Kevin: 0 }; let desglose = { Giancarlo: [], David: [], Kevin: [] }; gastos.forEach(g => { const pagador = g.pagador; const importe = parseFloat(g.importe); const esPago = g.concepto.startsWith('[PAGO]'); const implicadosStr = g.implicados || 'Giancarlo,David,Kevin'; const implicados = implicadosStr.split(','); if (esPago) { const receptor = implicados[0]; if (balances[pagador] !== undefined) balances[pagador] += importe; if (balances[receptor] !== undefined) balances[receptor] -= importe; if (desglose[pagador]) desglose[pagador].push(`<div class="linea-desglose"><span style="color:#3498db">💸 Devolviste ${importe.toFixed(2)}€</span> a ${receptor}.</div>`); if (desglose[receptor]) desglose[receptor].push(`<div class="linea-desglose"><span style="color:#3498db">📥 Recibiste ${importe.toFixed(2)}€</span> de ${pagador}.</div>`); } else { const cuota = importe / implicados.length; if (balances[pagador] !== undefined) { balances[pagador] += importe; desglose[pagador].push(`<div class="linea-desglose"><span style="color:#27ae60">🛒 Pagaste ${importe.toFixed(2)}€</span> por: ${g.concepto}</div>`); } implicados.forEach(imp => { let impName = imp.trim(); if (balances[impName] !== undefined) { balances[impName] -= cuota; if (impName !== pagador) { desglose[impName].push(`<div class="linea-desglose"><span style="color:#e74c3c">➖ Tu parte (-${cuota.toFixed(2)}€)</span> en: ${g.concepto} (Lo pagó ${pagador})</div>`); } else { desglose[impName].push(`<div class="linea-desglose"><span style="color:#7f8c8d">➖ Tu propia parte (-${cuota.toFixed(2)}€)</span> en: ${g.concepto}</div>`); } } }); } }); let deudores = []; let acreedores = []; socios.forEach(socio => { let neto = balances[socio]; if (neto < -0.01) deudores.push({ nombre: socio, cantidad: Math.abs(neto) }); else if (neto > 0.01) acreedores.push({ nombre: socio, cantidad: neto }); }); let transferencias = []; let i = 0, j = 0; while (i < deudores.length && j < acreedores.length) { let deudor = deudores[i]; let acreedor = acreedores[j]; let cantidadCruzada = Math.min(deudor.cantidad, acreedor.cantidad); transferencias.push(`<div class="deuda-linea"><span class="pagador">${deudor.nombre}</span> debe devolver a <span class="receptor">${acreedor.nombre}</span>: <strong>${cantidadCruzada.toFixed(2)} €</strong></div>`); deudor.cantidad -= cantidadCruzada; acreedor.cantidad -= cantidadCruzada; if (deudor.cantidad < 0.01) i++; if (acreedor.cantidad < 0.01) j++; } const divResumen = document.getElementById('resumenDeudas'); if (transferencias.length === 0) { divResumen.innerHTML = '<p style="color:#27ae60; font-weight:bold; font-size:1.2em;">¡Las cuentas están cuadradas a 0!</p>'; } else { divResumen.innerHTML = transferencias.join(''); } let htmlBalances = ''; socios.forEach(s => { let netoInfo = balances[s]; let colorNeto = netoInfo >= 0 ? 'bal-positivo' : 'bal-negativo'; let signo = netoInfo > 0 ? '+' : ''; let desgloseJSON = encodeURIComponent(JSON.stringify(desglose[s])); htmlBalances += `<div style="cursor:pointer; padding:10px; border-radius:8px; transition:0.2s; border: 1px solid transparent;" onmouseover="this.style.background='#f0f4f8'; this.style.borderColor='#1abc9c';" onmouseout="this.style.background='transparent'; this.style.borderColor='transparent';" onclick="mostrarDesglose('${s}', '${desgloseJSON}', ${netoInfo})"><strong>${s}</strong><br>Balance: <span class="${colorNeto}">${signo}${netoInfo.toFixed(2)}€</span><br><small style="color:#3498db;">🔍 Ver detalles</small></div>`; }); document.getElementById('resumenBalances').innerHTML = htmlBalances; }
+function mostrarDesglose(nombre, desgloseJSON, netoInfo) { document.getElementById('desgloseNombre').innerText = nombre; let colorNeto = netoInfo >= 0 ? 'green' : 'red'; let signo = netoInfo > 0 ? '+' : ''; document.getElementById('desgloseTotal').innerHTML = `<span style="color:${colorNeto}">${signo}${netoInfo.toFixed(2)} €</span>`; let operaciones = JSON.parse(decodeURIComponent(desgloseJSON)); let htmlOperaciones = operaciones.length > 0 ? operaciones.join('') : '<p style="padding:10px; text-align:center;">Aún no hay movimientos.</p>'; document.getElementById('desgloseOperaciones').innerHTML = htmlOperaciones; abrirModal('modalDesgloseSplitwise'); }
+document.getElementById('formGastoSocio').addEventListener('submit', function(e) { e.preventDefault(); const pagador = document.getElementById('g_pagador').value; const importe = document.getElementById('g_importe').value; const concepto = document.getElementById('g_concepto').value; const checkboxes = document.querySelectorAll('input[name="chk_implicados"]:checked'); const implicados = Array.from(checkboxes).map(c => c.value); if (implicados.length === 0) { alert("❌ Marca al menos a 1 persona en el reparto."); return; } fetch('/api/gastos', { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ pagador, importe, concepto, implicados }) }).then(r => r.json()).then(data => { if (data.error) alert("❌ " + data.error); else { document.getElementById('g_importe').value = ''; document.getElementById('g_concepto').value = ''; document.querySelectorAll('input[name="chk_implicados"]').forEach(c => c.checked = true); abrirGastosSocios(); } }); });
+document.getElementById('formPagoSocio').addEventListener('submit', function(e) { e.preventDefault(); const emisor = document.getElementById('p_emisor').value; const receptor = document.getElementById('p_receptor').value; const importe = document.getElementById('p_importe').value; if (emisor === receptor) { alert("❌ No puedes devolverte dinero a ti mismo."); return; } fetch('/api/gastos', { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ pagador: emisor, importe: importe, concepto: '[PAGO] Liquidación de deuda', implicados: [receptor] }) }).then(r => r.json()).then(data => { if (data.error) alert("❌ " + data.error); else { document.getElementById('p_importe').value = ''; abrirGastosSocios(); } }); });
+function borrarGastoSocio(id) { if (confirm("¿Borrar este movimiento?")) { fetch(`/api/gastos/${id}`, { method: 'DELETE', headers: headersSeguridad }).then(r => r.json()).then(() => { abrirGastosSocios(); }); } }
+
+// ── TICKETS / ADJUNTOS ───────────────────────────────────────
+
+function abrirTicketsOT(id, codigo) { otActualId = id; otActualCodigo = codigo; document.getElementById('t_codigo_ot').innerText = codigo; document.getElementById('t_file').value = ''; document.getElementById('t_importe').value = ''; document.getElementById('t_desc').value = ''; fetch(`/api/ot/${id}/adjuntos`).then(res => res.json()).then(data => { const galeria = document.getElementById('t_galeria'); galeria.innerHTML = ''; if (data.length === 0) galeria.innerHTML = '<p style="grid-column: 1/-1; color:#7f8c8d; text-align:center;">No hay líneas o tickets subidos.</p>'; data.forEach(t => { let btnB = sesion.rol === 'admin' ? `<button class="btn-peligro" style="padding: 3px 6px; font-size: 0.8em; margin-top: 5px;" onclick="borrarAdjuntoOT(${t.id}, ${id})">🗑️ Borrar</button>` : ''; let isStock = String(t.descripcion).includes('[STOCK]'); let imgHtml = isStock ? `<div style="height:150px; background:#e8f8f5; display:flex; align-items:center; justify-content:center; color:#27ae60; font-weight:bold;">📦 STOCK</div>` : `<img src="${t.imagen || imgDefecto}" class="ticket-img" onclick="window.open('${t.imagen}')">`; galeria.innerHTML += `<div class="ticket-card">${imgHtml}<div class="ticket-info"><strong>${t.importe.toFixed(2)} €</strong><br><small>${t.descripcion || 'Sin descripción'}</small><br><small style="color:#aaa;">${t.fecha}</small><br>${btnB}</div></div>`; }); abrirModal('modalTickets'); }); }
+function subirTicketOT() { const file = document.getElementById('t_file').files[0]; const importe = document.getElementById('t_importe').value; const desc = document.getElementById('t_desc').value; if (!file) { alert("❌ Adjunta una foto."); return; } comprimirImagen(file, (imagenB64) => { fetch(`/api/ot/${otActualId}/adjuntos`, { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ imagen: imagenB64, importe: importe, descripcion: desc }) }).then(res => res.json()).then(data => { if (data.error) alert("❌ " + data.error); else { alert("✅ " + data.mensaje); abrirTicketsOT(otActualId, otActualCodigo); cargarOTs(); } }); }); }
+function borrarAdjuntoOT(idAdjunto, otId) { if (confirm("¿Seguro que quieres borrar este material/ticket? Se restará del total de la OT.")) { fetch(`/api/ot/adjuntos/${idAdjunto}`, { method: 'DELETE', headers: headersSeguridad }).then(r => r.json()).then(data => { if (data.error) alert("❌ " + data.error); else { abrirTicketsOT(otId, otActualCodigo); cargarOTs(); } }); } }
+
+// ── LOGS ─────────────────────────────────────────────────────
+
+function abrirLogs() { fetch('/api/logs', { headers: headersSeguridad }).then(res => res.json()).then(data => { logsGlobal = data; const tbody = document.getElementById('cuerpoLogs'); tbody.innerHTML = ''; data.forEach(log => { let bc = log.estado === 'PENDIENTE' ? 'f39c12' : (log.estado === 'APROBADO' ? '27ae60' : 'e74c3c'); let b = ''; if (log.estado === 'PENDIENTE' && sesion.rol === 'admin') b = `<button onclick="resolverLog(${log.id}, 'APROBADO')">✅</button> <button onclick="resolverLog(${log.id}, 'RECHAZADO')">❌</button>`; tbody.innerHTML += `<tr><td>${log.fecha}</td><td>${log.usuario}</td><td>${log.accion}</td><td>${log.referencia}</td><td><span class="badge-log" style="background:#${bc}">${log.estado}</span></td><td>${b || '-'}</td></tr>`; }); abrirModal('modalLogs'); }); }
+function resolverLog(id, res) { let m = ""; if (res === 'RECHAZADO') { m = prompt("Motivo:"); if (!m) return; } fetch(`/api/logs/${id}/resolver`, { method: 'PUT', headers: headersSeguridad, body: JSON.stringify({ resolucion: res, motivo: m }) }).then(r => r.json()).then(d => { alert(d.mensaje); abrirLogs(); cargarOTs(); }); }
+
+// ── USUARIOS ─────────────────────────────────────────────────
+
+function guardarPassword() { fetch('/api/usuarios/password', { method: 'PUT', headers: headersSeguridad, body: JSON.stringify({ username: sesion.username, oldPass: document.getElementById('oldPass').value, newPass: document.getElementById('newPass').value }) }).then(r => r.json()).then(d => { if (d.error) alert("❌ " + d.error); else { alert("✅ " + d.mensaje); cerrarModal('modalPassword'); } }); }
+function crearTecnico() { const u = document.getElementById('newTecUser').value; const p = document.getElementById('newTecPass').value; if (!u || !p) return; fetch('/api/usuarios/tecnico', { method: 'POST', headers: headersSeguridad, body: JSON.stringify({ username: u, password: p }) }).then(r => r.json()).then(d => { if (d.error) alert("❌ " + d.error); else { alert("✅ " + d.mensaje); cerrarModal('modalTecnico'); cargarUsuariosParaOT(); } }); }
+
+// ── INIT ─────────────────────────────────────────────────────
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+inicializarUI();
+cargarClientes();
+setTimeout(cargarOTs, 500);

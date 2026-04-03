@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facturas Plus Ultra</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1abc9c">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Plus Ultra">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+
+    <div class="container no-print">
+        <div class="top-bar">
+            <div><a href="/bbdd" class="btn-secundario">🗄️ Abrir Base de Datos</a></div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="text-align: right; line-height: 1.2;">
+                    <strong id="topNombre" style="color: #2c3e50; font-size: 1.1em;"></strong><br>
+                    <small id="topRol" style="color: #7f8c8d; text-transform: capitalize;"></small>
+                </div>
+                <img id="topAvatar" src="" class="avatar-mini" onclick="abrirMenuLateral()">
+            </div>
+        </div>
+
+        <h1>🛠️ Registro de OT</h1>
+        <form id="formOT" onsubmit="preguntarMateriales(event)">
+            <div class="grid-2">
+                <div class="form-group"><label>Código de OT</label><input type="text" id="codigo_ot" required></div>
+                <div class="form-group"><label>Asignar Cliente (Opcional)</label><select id="ot_cliente_id"><option value="">-- Sin asignar / General --</option></select></div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group"><label>Fecha y hora del trabajo</label><input type="datetime-local" id="fecha_encargo" required></div>
+                <div class="form-group"><label>Fecha y hora finalización</label><input type="datetime-local" id="fecha_completada"></div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group"><label>Horas facturables (por persona)</label><input type="number" step="0.1" id="horas" required></div>
+                <div class="form-group">
+                    <label>Técnicos que realizaron el trabajo</label>
+                    <div style="display:flex; gap:10px;"><select id="selTecnicosAdd" style="flex-grow:1;"><option value="">-- Seleccionar --</option></select><button type="button" class="btn-secundario" style="margin:0; padding: 10px;" onclick="agregarTecnicoOT()">Añadir</button></div>
+                    <div id="listaTecnicosOT" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div>
+                </div>
+            </div>
+            <div class="form-group"><label>Marca / Descripción</label><input type="text" id="marca" required></div>
+            <div class="form-group"><label>Urgencia</label><select id="tipo_urgencia"><option value="Verde">🟢 Verde</option><option value="Amarillo">🟡 Amarillo</option><option value="Rojo">🔴 Rojo</option></select></div>
+            <button type="submit" class="btn-save" id="btnGuardarMain">Guardar Orden de Trabajo</button>
+        </form>
+
+        <div class="lista-ots" style="margin-top: 40px;">
+            <h2>📋 Órdenes Registradas</h2>
+            <div id="contenedorOTs"></div>
+        </div>
+    </div>
+
+    <div id="overlayMenu" class="overlay-menu" onclick="cerrarMenuLateral()"></div>
+    <div id="sideMenu" class="side-menu">
+        <span class="close-menu" onclick="cerrarMenuLateral()">&times;</span>
+        <div class="perfil-header">
+            <input type="file" id="inputFoto" style="display:none" accept="image/*" onchange="subirFoto(event)">
+            <div class="avatar-container" onclick="document.getElementById('inputFoto').click()">
+                <img id="menuAvatar" src="" class="avatar-large">
+            </div>
+            <h2 id="menuNombre" style="margin: 0; color: #1abc9c;">Nombre</h2>
+            <p id="menuRol" style="margin: 5px 0 0 0; color: #bdc3c7; text-transform: uppercase;"></p>
+        </div>
+        <div class="menu-items">
+            <button class="btn-side" style="background: #27ae60; font-size: 1.1em; font-weight: bold; margin-bottom: 20px;" onclick="abrirModuloStock()">📦 Stock de Materiales</button>
+            <div id="menuGastosArea" style="display: none; border-bottom: 1px solid #34495e; padding-bottom: 15px; margin-bottom: 15px;">
+                <button class="btn-side" style="background: #e67e22; font-size: 1.1em; font-weight: bold;" onclick="abrirGastosSocios()">💸 Control de Gastos (Socios)</button>
+            </div>
+            <button class="btn-side" style="background: #9b59b6; margin-bottom: 20px;" onclick="probarEnvioCorreo()">📧 Probar Envío de Correo</button>
+            <div id="menuClientesArea" style="display: none; border-bottom: 1px solid #34495e; padding-bottom: 15px; margin-bottom: 15px;">
+                <h4 style="color: #95a5a6; margin-top: 0;">👥 CRM CLIENTES</h4>
+                <button class="btn-side" style="background: #3498db;" onclick="abrirModal('modalClientes'); renderizarBurbujasClientes();">🗂️ Ver Clientes</button>
+                <button class="btn-side" style="background: #2ecc71;" onclick="abrirModal('modalCrearCliente')">➕ Nuevo Cliente</button>
+                <div id="menuSolicitudesArea"></div>
+            </div>
+            <button class="btn-side" onclick="abrirModal('modalPassword')">🔑 Cambiar Contraseña</button>
+            <div id="btnCrearTecnicoArea"></div>
+            <div id="btnLogsArea"></div>
+        </div>
+        <button class="btn-side-red" onclick="cerrarSesion()">🚪 CERRAR SESIÓN</button>
+    </div>
+
+    <div id="modalPreguntaMateriales" class="modal" style="z-index: 5000;">
+        <div class="modal-content" style="text-align: center; max-width: 400px;">
+            <h2>🛠️ ¿Se han utilizado materiales?</h2>
+            <p style="color: #7f8c8d; margin-bottom: 25px;">Indica si has necesitado recambios o materiales extras para completar esta OT.</p>
+            <div style="display: flex; gap: 15px;">
+                <button class="btn-secundario" style="flex-grow: 1; padding: 15px; font-size: 1.1em;" onclick="guardarOTFinal(false)">NO</button>
+                <button class="btn-save" style="margin-top: 0; flex-grow: 1; font-size: 1.1em;" onclick="abrirEditorMateriales()">SÍ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalLineasMateriales" class="modal" style="z-index: 5001;">
+        <div class="modal-content" style="max-width: 850px; background: #f4f7f6;">
+            <h2 style="margin-top:0;">🛒 Materiales Utilizados</h2>
+            <p style="color: #7f8c8d;">Añade los tickets o descuenta material de tu stock.</p>
+            <div id="contenedorLineasMat"></div>
+            <button class="btn-secundario" style="width: 100%; border: 2px dashed #95a5a6; background: transparent; color: #333; padding: 15px; font-weight: bold;" onclick="addLineaMaterial()">+ Añadir nuevo material</button>
+            <div style="text-align: right; margin-top: 20px; font-size: 1.2em;">Total Materiales: <strong id="totalMaterialesCalc">0.00</strong> €</div>
+            <button class="btn-save" style="background-color: #27ae60;" onclick="guardarOTFinal(true)">✅ Guardar Materiales</button>
+            <button class="btn-peligro" style="width: 100%; margin-top: 10px;" onclick="cerrarModal('modalLineasMateriales')">❌ Cancelar</button>
+        </div>
+    </div>
+
+    <div id="modalEscanerIA" class="modal" style="z-index: 6000;">
+        <div class="modal-content" style="max-width: 500px; text-align: center;">
+            <span class="close-modal" onclick="cerrarModal('modalEscanerIA')">&times;</span>
+            <h2 style="margin-top:0; color:#8e44ad;">🤖 Escáner de Tickets IA</h2>
+            <p style="color: #7f8c8d;">Sube una foto clara de tu ticket y la IA extraerá las líneas de compra automáticamente.</p>
+            
+            <input type="file" id="ia_file" accept="image/*" capture="environment" style="display:none;" onchange="ejecutarEscaneoIA(this)">
+            
+            <div class="ai-scanner-box" id="ia_dropzone" onclick="document.getElementById('ia_file').click()">
+                <div style="font-size: 40px; margin-bottom: 10px;">📸</div>
+                <strong>Toca aquí para hacer una foto o subir un ticket</strong>
+            </div>
+
+            <div id="ia_loading" style="display:none; color: #e67e22; font-weight: bold; margin-top: 15px;">
+                ⏳ La IA está leyendo el ticket... espera unos segundos.
+            </div>
+        </div>
+    </div>
+
+    <div id="modalStock" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close-modal" onclick="cerrarModal('modalStock')">&times;</span>
+            <h2 style="margin-top:0; color:#27ae60;">📦 Stock de Materiales</h2>
+            <div style="background: #e8f8f5; border: 1px solid #27ae60; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #16a085;">Añadir al Almacén</h4>
+                <form id="formStock">
+                    <div class="form-group"><label>Descripción del Material</label><input type="text" id="s_desc" placeholder="Ej: Cable cobre 1.5mm" required></div>
+                    <div class="grid-2">
+                        <div class="form-group"><label>Cantidad Comprada</label><input type="number" step="0.01" id="s_cant" required></div>
+                        <div class="form-group"><label>Precio Total del Ticket (€)</label><input type="number" step="0.01" id="s_precio" required></div>
+                    </div>
+                    <div class="form-group"><label>Foto del Ticket / Factura (Opcional)</label><input type="file" id="s_file" accept="image/*"></div>
+                    <button type="submit" class="btn-save" style="margin-top: 0; padding: 10px; background: #27ae60;">Guardar en Stock</button>
+                </form>
+            </div>
+            <table class="tabla-logs" style="width: 100%;">
+                <thead><tr><th>Material</th><th>Unidades Disp.</th><th>Precio/U (Calc.)</th><th>Tickets</th></tr></thead>
+                <tbody id="tablaStockBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="modalTickets" class="modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <span class="close-modal" onclick="cerrarModal('modalTickets')">&times;</span>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin:0;">🛠️ Gestor de Materiales</h2>
+                <button class="btn-save" style="background:#8e44ad; padding: 10px; width: auto; margin:0;" onclick="abrirEscanerIA()">🤖 Ticket por IA</button>
+            </div>
+            <p style="color:#7f8c8d; font-size: 0.9em; margin-bottom: 20px;">OT: <strong id="t_codigo_ot" style="color:#2c3e50;"></strong></p>
+            
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button class="btn-save" style="background-color: #27ae60; padding: 12px; font-size: 1.1em;" onclick="abrirGestorMaterialesEdicion()">➕ Añadir Múltiples Materiales / Almacén</button>
+            </div>
+
+            <div style="background: #e8f8f5; border: 1px solid #1abc9c; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #16a085;">Subir ticket manual rápido</h4>
+                <div class="grid-2">
+                    <div class="form-group"><label>Foto del ticket</label><input type="file" id="t_file" accept="image/*" capture="environment"></div>
+                    <div class="form-group"><label>Coste (€) <small>- Se sumará a la OT</small></label><input type="number" step="0.01" id="t_importe" placeholder="0.00"></div>
+                </div>
+                <div class="form-group"><label>Descripción (Opcional)</label><input type="text" id="t_desc" placeholder="Ej: Recambio Leroy Merlin..."></div>
+                <button class="btn-save" style="margin-top: 0; padding: 10px;" onclick="subirTicketOT()">Subir Ticket Manual</button>
+            </div>
+            <h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px;">Líneas Registradas en esta OT</h3>
+            <div id="t_galeria" class="ticket-gallery"></div>
+        </div>
+    </div>
+
+    <div id="modalEditarOT" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-modal" onclick="cerrarModal('modalEditarOT')">&times;</span>
+            <h2 style="margin-top:0; color:#f39c12;">✏️ Editar Orden de Trabajo</h2>
+            <form id="formEditarOTDirecto">
+                <div class="grid-2">
+                    <div class="form-group"><label>Código de OT</label><input type="text" id="ed_codigo_ot" required></div>
+                    <div class="form-group"><label>Cliente</label><select id="ed_ot_cliente_id"><option value="">-- Sin asignar --</option></select></div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Fecha encargo</label><input type="datetime-local" id="ed_fecha_encargo" required></div>
+                    <div class="form-group"><label>Finalización</label><input type="datetime-local" id="ed_fecha_completada"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Horas</label><input type="number" step="0.1" id="ed_horas" required></div>
+                    <div class="form-group"><label>Técnicos</label>
+                        <div style="display:flex; gap:10px;"><select id="ed_selTecnicosAdd" style="flex-grow:1;"><option value="">-- Seleccionar --</option></select><button type="button" class="btn-secundario" style="margin:0; padding:10px;" onclick="agregarEdTecnicoOT()">Añadir</button></div>
+                        <div id="ed_listaTecnicosOT" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div>
+                    </div>
+                </div>
+                <div class="form-group"><label>Marca</label><input type="text" id="ed_marca" required></div>
+                
+                <div class="grid-2">
+                    <div class="form-group"><label>Urgencia</label><select id="ed_tipo_urgencia"><option value="Verde">🟢 Verde</option><option value="Amarillo">🟡 Amarillo</option><option value="Rojo">🔴 Rojo</option></select></div>
+                    <div class="form-group">
+                        <label>Materiales Totales Registrados</label>
+                        <div style="display:flex; align-items:center; gap: 10px;">
+                            <strong id="ed_materiales_texto" style="font-size: 1.2em; color: #e67e22;">0.00 €</strong>
+                            <button type="button" class="btn-secundario" style="margin:0; padding: 8px;" onclick="abrirGestorMaterialesDesdeEdicion()">Ver o editar materiales</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-save" style="background-color: #f39c12;" onclick="guardarEdicionOT()">💾 Sobrescribir Cambios OT</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditarCliente" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="cerrarModal('modalEditarCliente')">&times;</span>
+            <h2 style="margin-top:0; color:#3498db;">✏️ Editar Datos del Cliente</h2>
+            <form id="formEditarCliente">
+                <input type="hidden" id="edit_c_id">
+                <div class="form-group"><label>Nombre Empresa / Cliente</label><input type="text" id="edit_c_nombre" required></div>
+                <div class="form-group"><label>NIF / CIF</label><input type="text" id="edit_c_nif" required></div>
+                <div class="form-group"><label>Dirección Fiscal</label><input type="text" id="edit_c_direccion" required></div>
+                <div class="grid-2">
+                    <div class="form-group"><label>Teléfono</label><input type="text" id="edit_c_telefono"></div>
+                    <div class="form-group"><label>Email</label><input type="email" id="edit_c_email"></div>
+                </div>
+                <div class="form-group"><label>Actualizar Logotipo (Opcional)</label><input type="file" id="edit_c_logo_file" accept="image/*"></div>
+                <button type="submit" class="btn-save" style="background-color: #3498db;">💾 Guardar Cambios</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalGastos" class="modal"><div class="modal-content" style="max-width: 700px; background-color: #fcfcfc;"><span class="close-modal" onclick="cerrarModal('modalGastos')">&times;</span><h2 style="margin-top:0;">💸 Cuentas Claras (Socios)</h2><div style="background: #fff; border: 1px solid #dce4ec; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);"><div style="display:flex; border-bottom: 2px solid #ddd; margin-bottom: 15px;"><div id="tabGasto" style="flex-grow: 1; text-align: center; padding:10px; cursor:pointer; border-bottom: 3px solid #1abc9c; font-weight:bold; color:#1abc9c;" onclick="cambiarTabGastos('gasto')">🛒 Registrar Gasto Compartido</div><div id="tabPago" style="flex-grow: 1; text-align: center; padding:10px; cursor:pointer; color:#7f8c8d;" onclick="cambiarTabGastos('pago')">💸 Pagar Deuda a un Socio</div></div><div id="panelGasto"><form id="formGastoSocio"><div class="grid-2"><div class="form-group"><label>¿Quién pagó el gasto?</label><select id="g_pagador" required><option value="Giancarlo">Giancarlo</option><option value="David">David</option><option value="Kevin">Kevin</option></select></div><div class="form-group"><label>Importe Total (€)</label><input type="number" step="0.01" id="g_importe" required></div></div><div class="form-group"><label>Concepto</label><input type="text" id="g_concepto" required></div><div class="form-group"><label>¿Para quiénes era este gasto?</label><div class="checkbox-group"><label><input type="checkbox" name="chk_implicados" value="Giancarlo" checked> Giancarlo</label><label><input type="checkbox" name="chk_implicados" value="David" checked> David</label><label><input type="checkbox" name="chk_implicados" value="Kevin" checked> Kevin</label></div></div><button type="submit" class="btn-save" style="margin-top: 0; padding: 10px;">Añadir Gasto</button></form></div><div id="panelPago" style="display:none;"><div style="background: #ebf5fb; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 0.9em; border-left: 3px solid #3498db;">Usa esta pestaña exclusivamente cuando uno de vosotros le devuelva dinero a otro para saldar las deudas.</div><form id="formPagoSocio"><div class="grid-2"><div class="form-group"><label style="color:#e74c3c;">¿Quién está devolviendo el dinero?</label><select id="p_emisor" required><option value="Giancarlo">Giancarlo</option><option value="David">David</option><option value="Kevin">Kevin</option></select></div><div class="form-group"><label style="color:#27ae60;">¿A quién se lo está dando?</label><select id="p_receptor" required><option value="Kevin">Kevin</option><option value="Giancarlo">Giancarlo</option><option value="David">David</option></select></div></div><div class="form-group"><label>Importe devuelto (€)</label><input type="number" step="0.01" id="p_importe" required></div><button type="submit" class="btn-save" style="margin-top: 0; padding: 10px; background-color: #3498db;">Registrar Devolución de Dinero</button></form></div></div><div class="caja-deudas"><h3>⚖️ Ajuste de Cuentas</h3><div id="resumenDeudas">Cargando...</div><div style="margin-top: 15px; font-size: 0.9em; color: #7f8c8d; display: flex; justify-content: space-around; border-top: 1px solid #ccc; padding-top: 10px;" id="resumenBalances"></div></div><h3 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 30px;">📜 Historial de Movimientos</h3><div id="listaHistorialGastos" style="max-height: 250px; overflow-y: auto; background: #fff; border-radius: 8px; border: 1px solid #eee;"></div></div></div>
+    <div id="modalDesgloseSplitwise" class="modal" style="z-index: 5000; background: rgba(0,0,0,0.8);"><div class="modal-content" style="max-width: 500px; padding: 20px;"><span class="close-modal" onclick="cerrarModal('modalDesgloseSplitwise')">&times;</span><h3 style="margin-top:0; border-bottom: 2px solid #1abc9c; padding-bottom: 10px;">🔍 Desglose de <span id="desgloseNombre"></span></h3><div style="text-align: center; margin-bottom: 15px; font-size: 1.2em;">Balance Final: <strong id="desgloseTotal"></strong></div><div id="desgloseOperaciones" style="max-height: 400px; overflow-y: auto; background: #f8f9fa; border: 1px solid #ccc; border-radius: 5px;"></div></div></div>
+    <div id="modalClientes" class="modal"><div class="modal-content" style="max-width: 800px;"><span class="close-modal" onclick="cerrarModal('modalClientes')">&times;</span><h2>👥 Cartera de Clientes</h2><div id="gridClientes" class="clientes-grid"></div></div></div>
+    <div id="modalCrearCliente" class="modal"><div class="modal-content"><span class="close-modal" onclick="cerrarModal('modalCrearCliente')">&times;</span><h2>🏢 Registrar Nuevo Cliente</h2><form id="formCliente"><div class="form-group"><label>Nombre Empresa / Cliente</label><input type="text" id="c_nombre" required></div><div class="form-group"><label>NIF / CIF</label><input type="text" id="c_nif" required></div><div class="form-group"><label>Dirección Fiscal</label><input type="text" id="c_direccion" required></div><div class="grid-2"><div class="form-group"><label>Teléfono</label><input type="text" id="c_telefono"></div><div class="form-group"><label>Email</label><input type="email" id="c_email"></div></div><div class="form-group"><label>Logotipo (Opcional)</label><input type="file" id="c_logo_file" accept="image/*"></div><button type="submit" class="btn-save" id="btnGuardarCliente">Guardar Cliente</button></form></div></div>
+    <div id="modalDetalleCliente" class="modal"><div class="modal-content" style="max-width: 700px;"><span class="close-modal" onclick="cerrarModal('modalDetalleCliente')">&times;</span><div style="text-align: center; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px;"><img id="d_c_logo" src="" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #1abc9c;"><h2 id="d_c_nombre" style="margin: 10px 0 0 0;"></h2><div id="d_c_acciones" style="margin-top: 10px;"></div></div><div class="cliente-detalle-box"><p><strong>NIF/CIF:</strong> <span id="d_c_nif"></span></p><p><strong>Dirección:</strong> <span id="d_c_direccion"></span></p><p><strong>Contacto:</strong> <span id="d_c_tel"></span> | <span id="d_c_email"></span></p></div><h3>🛠️ Historial de OTs</h3><div id="d_c_ots" style="max-height: 300px; overflow-y: auto;"></div></div></div>
+    <div id="modalSolicitudesClientes" class="modal"><div class="modal-content" style="max-width: 800px;"><span class="close-modal" onclick="cerrarModal('modalSolicitudesClientes')">&times;</span><h2>🔔 Solicitudes de Clientes</h2><table class="tabla-logs"><thead><tr><th>Cliente</th><th>NIF</th><th>Añadido por</th><th>Acción</th></tr></thead><tbody id="tbodySolicitudesClientes"></tbody></table></div></div>
+    <div id="modalFactura" class="modal"><div class="modal-content modal-content-folio" id="facturaAreaImpresion"><span class="close-modal no-print" onclick="cerrarModal('modalFactura')">&times;</span><div class="factura-header"><div class="datos-empresa"><img src="/logo.png" style="max-width: 240px; margin-bottom: 10px;" onerror="this.style.display='none'"><h3>ServiPlusUltra Solutions S.L.</h3><p>B-26892760</p><p>Carrer d'Aribau 168, 1-1, 08036 BCN</p></div><div class="datos-factura"><h2>FACTURA</h2><p><strong>Ref:</strong> <span id="factOtCode"></span></p><p><strong>Fecha:</strong> <span id="factFechaHoy"></span></p><div class="caja-cliente-fact"><strong>Facturar a:</strong><select id="selClienteFactura" class="no-print" onchange="actualizarInfoClienteFactura()" style="width:100%; padding:8px; margin-top:5px;"></select><div id="printClienteNombre" class="only-print" style="font-weight:bold; font-size:1.1em;"></div><div id="infoClienteFacturaTexto" style="font-size:0.9em; margin-top:5px;"></div></div></div></div><table class="tabla-holded" id="tablaLineasFactura"><thead><tr><th style="width: 50%;">Concepto</th><th>Cant.</th><th>Precio/U (€)</th><th style="text-align: right;">Total</th><th style="width: 5%;" class="no-print"></th></tr></thead><tbody id="tbodyLineas"></tbody></table><button class="btn-secundario no-print" onclick="agregarLineaBlanco()" style="margin-top: 15px;">+ Añadir línea</button><div style="display:flex; justify-content:flex-end; margin-top:30px;"><div class="totales-caja"><p>Base: <strong><span id="factBase">0.00</span> €</strong></p><p>IVA (21%): <strong><span id="factIva">0.00</span> €</strong></p><h3>Total: <span id="factTotal">0.00</span> €</h3></div></div><div style="display: flex; gap: 15px; margin-top: 40px;" class="no-print"><button class="btn-secundario" style="flex-grow: 1; padding: 15px; font-size: 16px;" onclick="window.print()">🖨️ Imprimir PDF Local</button><button class="btn-save" style="flex-grow: 1; margin-top: 0; background-color: #9b59b6;" onclick="enviarFacturaAlCliente()">📧 Enviar Factura por Email</button></div></div></div>
+    <div id="modalEditarLog" class="modal"><div class="modal-content" style="max-width: 600px;"><span class="close-modal" onclick="cerrarModal('modalEditarLog')">&times;</span><h2 style="margin-top:0;">✏️ Editar Petición</h2><form id="formEditarLog"><input type="hidden" id="editLogId"><div class="form-group"><label>Código de OT</label><input type="text" id="e_codigo_ot" required></div><div class="grid-2"><div class="form-group"><label>Fecha encargo</label><input type="datetime-local" id="e_fecha_encargo" required></div><div class="form-group"><label>Finalización</label><input type="datetime-local" id="e_fecha_completada"></div></div><div class="grid-2"><div class="form-group"><label>Horas</label><input type="number" step="0.1" id="e_horas" required></div><div class="form-group"><label>Técnicos</label><div style="display:flex; gap:10px;"><select id="e_selTecnicosAdd" style="flex-grow:1;"><option value="">-- Seleccionar --</option></select><button type="button" class="btn-secundario" style="margin:0; padding:10px;" onclick="agregarETecnicoOT()">Añadir</button></div><div id="e_listaTecnicosOT" style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;"></div></div></div><div class="form-group"><label>Marca</label><input type="text" id="e_marca" required></div><div class="grid-2"><div class="form-group"><label>Urgencia</label><select id="e_tipo_urgencia"><option value="Verde">🟢 Verde</option><option value="Amarillo">🟡 Amarillo</option><option value="Rojo">🔴 Rojo</option></select></div><div class="form-group"><label>Materiales (€)</label><input type="number" step="0.01" id="e_materiales_precio" required></div></div><button type="button" class="btn-save" onclick="guardarEdicionLog()">Guardar Cambios</button></form></div></div>
+    <div id="modalLogs" class="modal"><div class="modal-content" style="max-width: 1000px;"><span class="close-modal" onclick="cerrarModal('modalLogs')">&times;</span><h2 style="margin-top:0;">📝 Auditoría</h2><table class="tabla-logs"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Referencia</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="cuerpoLogs"></tbody></table></div></div>
+    <div id="modalPassword" class="modal"><div class="modal-content"><span class="close-modal" onclick="cerrarModal('modalPassword')">&times;</span><h2 style="margin-top:0;">🔑 Cambiar Clave</h2><input type="password" id="oldPass" placeholder="Actual" class="form-group"><input type="password" id="newPass" placeholder="Nueva" class="form-group"><button class="btn-save" onclick="guardarPassword()">Guardar</button></div></div>
+    <div id="modalTecnico" class="modal"><div class="modal-content"><span class="close-modal" onclick="cerrarModal('modalTecnico')">&times;</span><h2 style="margin-top:0;">👷 Crear Técnico</h2><input type="text" id="newTecUser" placeholder="Usuario" class="form-group"><input type="text" id="newTecPass" placeholder="Clave" class="form-group"><button class="btn-save" onclick="crearTecnico()">Crear</button></div></div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>
