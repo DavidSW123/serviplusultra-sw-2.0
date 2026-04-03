@@ -102,7 +102,10 @@
     <div class="top-bar-pres">
         <a href="/">← Volver al inicio</a>
         <h2 style="margin:0; border:none; padding:0; font-size:1.2em;">📋 Presupuestos</h2>
-        <button class="btn-nuevo" onclick="abrirNuevoPresupuesto()">+ Nuevo presupuesto</button>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <button class="btn-nuevo" onclick="abrirNuevoPresupuesto()">+ Nuevo presupuesto</button>
+            <img id="presAvatar" src="/icon-192.png" style="width:40px;height:40px;border-radius:50%;border:2px solid #ccc;cursor:pointer;object-fit:cover;" onclick="abrirMenuLateral()">
+        </div>
     </div>
 
     <!-- Filtros -->
@@ -181,58 +184,108 @@
     </div>
 </div>
 
-<!-- PDF invisible -->
-<div id="pdfPresupuesto">
-    <div style="font-family:'Segoe UI',Arial,sans-serif; padding:40px; max-width:700px; margin:0 auto; color:#2c3e50;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px;">
-            <div>
-                <div style="font-size:1.5em; font-weight:bold; color:#9b59b6;">ServiPlusUltra Solutions S.L.</div>
-                <div style="font-size:0.88em; color:#7f8c8d; margin-top:4px;">NIF: B-26892760</div>
-                <div style="font-size:0.88em; color:#7f8c8d;">Carrer d'Aribau 168, 1-1, 08036 Barcelona</div>
-            </div>
-            <div style="text-align:right;">
-                <div style="font-size:1.2em; font-weight:bold;" id="pdfRef">—</div>
-                <div style="font-size:0.85em; color:#7f8c8d;" id="pdfFecha">—</div>
-            </div>
+<!-- PDF invisible — plantilla profesional -->
+<div id="pdfPresupuesto" style="display:none;">
+<div style="font-family:Arial,sans-serif; width:210mm; min-height:297mm; margin:0; padding:0; color:#2c3e50; background:#fff; box-sizing:border-box;">
+
+    <!-- Cabecera con franja de color -->
+    <div style="background:#2c3e50; padding:28px 36px 20px 36px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <img src="/logo.png" style="max-height:56px; max-width:180px;" onerror="this.style.display='none'">
         </div>
-        <div style="background:#f8f4ff; border-radius:8px; padding:16px 20px; margin-bottom:24px;">
-            <div style="font-size:0.8em; color:#9b59b6; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px;">Cliente</div>
-            <div style="font-weight:600;" id="pdfCliente">—</div>
-            <div style="font-size:0.85em; color:#7f8c8d;" id="pdfClienteDir">—</div>
-            <div style="font-size:0.85em; color:#7f8c8d;" id="pdfClienteNif">—</div>
+        <div style="text-align:right; color:#fff;">
+            <div style="font-size:2em; font-weight:bold; letter-spacing:2px; color:#1abc9c;">PRESUPUESTO</div>
+            <div style="font-size:1.1em; font-weight:600; margin-top:4px;" id="pdfRef">—</div>
+            <div style="font-size:0.82em; color:#bdc3c7; margin-top:2px;" id="pdfFecha">—</div>
         </div>
-        <div style="margin-bottom:20px;">
-            <div style="font-size:0.8em; color:#9b59b6; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">Descripción del trabajo</div>
-            <div id="pdfDesc" style="font-size:0.92em; line-height:1.6;">—</div>
+    </div>
+
+    <!-- Banda verde fina -->
+    <div style="background:#1abc9c; height:4px;"></div>
+
+    <!-- Bloque empresa + cliente -->
+    <div style="display:flex; gap:0; border-bottom:1px solid #eee;">
+        <!-- Empresa emisora -->
+        <div style="flex:1; padding:20px 36px; border-right:1px solid #eee;">
+            <div style="font-size:0.7em; color:#9b59b6; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:6px;">Emisor</div>
+            <div style="font-weight:700; font-size:1em; color:#2c3e50;">ServiPlusUltra Solutions S.L.</div>
+            <div style="font-size:0.82em; color:#7f8c8d; margin-top:2px;">NIF: B-26892760</div>
+            <div style="font-size:0.82em; color:#7f8c8d;">Carrer d'Aribau 168, 1-1</div>
+            <div style="font-size:0.82em; color:#7f8c8d;">08036 Barcelona</div>
         </div>
-        <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.88em;" id="pdfLineasTable">
+        <!-- Cliente -->
+        <div style="flex:1; padding:20px 36px;">
+            <div style="font-size:0.7em; color:#9b59b6; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:6px;">Facturar a</div>
+            <div style="font-weight:700; font-size:1em; color:#2c3e50;" id="pdfCliente">—</div>
+            <div style="font-size:0.82em; color:#7f8c8d; margin-top:2px;" id="pdfClienteNif"></div>
+            <div style="font-size:0.82em; color:#7f8c8d;" id="pdfClienteDir"></div>
+            <div style="font-size:0.82em; color:#7f8c8d;" id="pdfClienteEmail"></div>
+        </div>
+    </div>
+
+    <!-- Descripción del trabajo -->
+    <div style="padding:18px 36px; background:#fafafa; border-bottom:1px solid #eee;">
+        <div style="font-size:0.7em; color:#9b59b6; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:6px;">Descripción del trabajo</div>
+        <div id="pdfDesc" style="font-size:0.9em; line-height:1.7; color:#2c3e50;">—</div>
+    </div>
+
+    <!-- Tabla de líneas -->
+    <div style="padding:20px 36px;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.88em;">
             <thead>
-                <tr style="background:#9b59b6; color:#fff;">
-                    <th style="padding:8px 12px; text-align:left; border-radius:4px 0 0 0;">Concepto</th>
-                    <th style="padding:8px 12px; text-align:right; border-radius:0 4px 0 0;">Importe</th>
+                <tr style="background:#2c3e50; color:#fff;">
+                    <th style="padding:10px 14px; text-align:left; font-weight:600;">Concepto</th>
+                    <th style="padding:10px 14px; text-align:right; font-weight:600; width:130px;">Importe (€)</th>
                 </tr>
             </thead>
             <tbody id="pdfLineas"></tbody>
         </table>
-        <div style="margin-left:auto; width:220px;">
-            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
-                <span style="color:#7f8c8d;">Base imponible</span><span id="pdfBase2">—</span>
+
+        <!-- Totales -->
+        <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+            <div style="width:260px;">
+                <div style="display:flex; justify-content:space-between; padding:7px 14px; background:#f8f9fa; border-radius:4px 4px 0 0; font-size:0.88em;">
+                    <span style="color:#7f8c8d;">Base imponible</span>
+                    <span style="font-weight:600;" id="pdfBase2">—</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:7px 14px; background:#f0f0f0; font-size:0.88em;">
+                    <span style="color:#7f8c8d;">IVA (21%)</span>
+                    <span style="font-weight:600;" id="pdfIva2">—</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:10px 14px; background:#2c3e50; border-radius:0 0 4px 4px; color:#fff;">
+                    <span style="font-weight:700; font-size:0.95em;">TOTAL</span>
+                    <span style="font-weight:700; font-size:1.05em; color:#1abc9c;" id="pdfTotal2">—</span>
+                </div>
             </div>
-            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee;">
-                <span style="color:#7f8c8d;">IVA (21%)</span><span id="pdfIva2">—</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; padding:8px 0; font-weight:bold; font-size:1.05em;">
-                <span>TOTAL</span><span id="pdfTotal2">—</span>
-            </div>
-        </div>
-        <div id="pdfNotas" style="margin-top:24px; font-size:0.82em; color:#7f8c8d; border-top:1px solid #eee; padding-top:12px;"></div>
-        <div style="margin-top:32px; font-size:0.78em; color:#aaa; text-align:center;">
-            Este presupuesto tiene una validez de 30 días desde la fecha de emisión.
         </div>
     </div>
+
+    <!-- Notas -->
+    <div id="pdfNotasBloque" style="padding:0 36px 16px 36px; display:none;">
+        <div style="background:#fffbe6; border-left:3px solid #f39c12; padding:10px 14px; border-radius:0 4px 4px 0; font-size:0.82em; color:#7f8c8d;">
+            <strong style="color:#e67e22;">Notas:</strong> <span id="pdfNotas"></span>
+        </div>
+    </div>
+
+    <!-- Pie de página -->
+    <div style="margin:0 36px; border-top:2px solid #1abc9c; padding-top:14px; padding-bottom:28px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+            <div style="font-size:0.75em; color:#aaa;">
+                <div>Este presupuesto tiene una validez de <strong>30 días</strong> desde la fecha de emisión.</div>
+                <div style="margin-top:3px;">Para aceptarlo, responda a este documento o contacte con nosotros.</div>
+            </div>
+            <div style="text-align:right; font-size:0.75em; color:#aaa;">
+                <div style="font-weight:600; color:#2c3e50;">ServiPlusUltra Solutions S.L.</div>
+                <div>B-26892760 · Barcelona</div>
+            </div>
+        </div>
+    </div>
+
+</div>
 </div>
 
 <script src="/js/api.js"></script>
+<script src="/js/sidemenu.js"></script>
 <script src="/js/presupuestos.js"></script>
 </body>
 </html>

@@ -24,12 +24,15 @@ function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
 
 Promise.all([
     API.get('/api/presupuestos'),
-    API.get('/api/clientes')
-]).then(([pres, clientes]) => {
+    API.get('/api/clientes'),
+    API.get('/api/usuarios/nombres')
+]).then(([pres, clientes, usuarios]) => {
     presupuestosGlobal = pres;
     clientesPresGlobal = clientes.filter(c => c.estado === 'ACTIVO' || !c.estado);
     renderizarPresupuestos(presupuestosGlobal);
     _poblarSelectClientes();
+    const yo = usuarios.find(u => u.username === sesion.username);
+    if (yo && yo.foto) document.getElementById('presAvatar').src = yo.foto;
 });
 
 function _poblarSelectClientes() {
@@ -268,22 +271,20 @@ async function ejecutarConversion() {
 
 // ── PDF ────────────────────────────────────────────────────────
 
-function generarPDF(id) {
-    const p = presupuestosGlobal.find(x => x.id === id);
-    if (!p) return;
-
-    document.getElementById('pdfRef').innerText     = p.referencia;
-    document.getElementById('pdfFecha').innerText   = fmtFecha(p.fecha_creacion);
-    document.getElementById('pdfCliente').innerText = p.cliente_nombre || '— Sin cliente —';
-    document.getElementById('pdfClienteDir').innerText = p.cliente_direccion || '';
-    document.getElementById('pdfClienteNif').innerText = p.cliente_nif ? `NIF: ${p.cliente_nif}` : '';
-    document.getElementById('pdfDesc').innerText    = p.descripcion || '';
+function _rellenarPDF(p) {
+    document.getElementById('pdfRef').innerText          = p.referencia;
+    document.getElementById('pdfFecha').innerText        = fmtFecha(p.fecha_creacion);
+    document.getElementById('pdfCliente').innerText      = p.cliente_nombre || '— Sin cliente —';
+    document.getElementById('pdfClienteNif').innerText   = p.cliente_nif    ? `NIF: ${p.cliente_nif}` : '';
+    document.getElementById('pdfClienteDir').innerText   = p.cliente_direccion || '';
+    document.getElementById('pdfClienteEmail').innerText = p.cliente_email  || '';
+    document.getElementById('pdfDesc').innerText         = p.descripcion    || '';
 
     const lineas = JSON.parse(p.lineas || '[]');
-    document.getElementById('pdfLineas').innerHTML = lineas.map(l =>
-        `<tr>
-            <td style="padding:7px 12px; border-bottom:1px solid #f0f0f0;">${l.descripcion || ''}</td>
-            <td style="padding:7px 12px; border-bottom:1px solid #f0f0f0; text-align:right;">${fmtP(l.importe)}</td>
+    document.getElementById('pdfLineas').innerHTML = lineas.map((l, i) =>
+        `<tr style="background:${i%2===0?'#fff':'#f8f9fa'}">
+            <td style="padding:9px 14px; border-bottom:1px solid #f0f0f0;">${l.descripcion || ''}</td>
+            <td style="padding:9px 14px; border-bottom:1px solid #f0f0f0; text-align:right; font-weight:600;">${fmtP(l.importe)}</td>
         </tr>`
     ).join('');
 
@@ -291,17 +292,27 @@ function generarPDF(id) {
     document.getElementById('pdfIva2').innerText   = fmtP(p.iva);
     document.getElementById('pdfTotal2').innerText = fmtP(p.total);
 
-    const notasEl = document.getElementById('pdfNotas');
-    notasEl.innerText = p.notas ? `Notas: ${p.notas}` : '';
+    const notasBloque = document.getElementById('pdfNotasBloque');
+    if (p.notas) {
+        document.getElementById('pdfNotas').innerText = p.notas;
+        notasBloque.style.display = 'block';
+    } else {
+        notasBloque.style.display = 'none';
+    }
+}
 
+function generarPDF(id) {
+    const p = presupuestosGlobal.find(x => x.id === id);
+    if (!p) return;
+    _rellenarPDF(p);
     const el = document.getElementById('pdfPresupuesto');
     el.style.display = 'block';
     html2pdf().set({
-        margin:     [10, 10],
-        filename:   `${p.referencia.replace('/', '-')}.pdf`,
-        image:      { type: 'jpeg', quality: 0.95 },
-        html2canvas:{ scale: 2 },
-        jsPDF:      { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        margin:      0,
+        filename:    `${p.referencia.replace('/', '-')}.pdf`,
+        image:       { type: 'jpeg', quality: 0.97 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).from(el).save().then(() => { el.style.display = 'none'; });
 }
 
@@ -310,23 +321,7 @@ async function enviarPorEmail(id) {
     if (!p || !p.cliente_email) { alert('El cliente no tiene email registrado.'); return; }
     if (!confirm(`¿Enviar el presupuesto ${p.referencia} a ${p.cliente_email}?`)) return;
 
-    // Generar PDF como base64 y enviar
-    document.getElementById('pdfRef').innerText     = p.referencia;
-    document.getElementById('pdfFecha').innerText   = fmtFecha(p.fecha_creacion);
-    document.getElementById('pdfCliente').innerText = p.cliente_nombre || '';
-    document.getElementById('pdfClienteDir').innerText = p.cliente_direccion || '';
-    document.getElementById('pdfClienteNif').innerText = p.cliente_nif ? `NIF: ${p.cliente_nif}` : '';
-    document.getElementById('pdfDesc').innerText    = p.descripcion || '';
-
-    const lineas = JSON.parse(p.lineas || '[]');
-    document.getElementById('pdfLineas').innerHTML = lineas.map(l =>
-        `<tr><td style="padding:7px 12px; border-bottom:1px solid #f0f0f0;">${l.descripcion || ''}</td>
-             <td style="padding:7px 12px; border-bottom:1px solid #f0f0f0; text-align:right;">${fmtP(l.importe)}</td></tr>`
-    ).join('');
-    document.getElementById('pdfBase2').innerText  = fmtP(p.base_imponible);
-    document.getElementById('pdfIva2').innerText   = fmtP(p.iva);
-    document.getElementById('pdfTotal2').innerText = fmtP(p.total);
-    document.getElementById('pdfNotas').innerText  = p.notas ? `Notas: ${p.notas}` : '';
+    _rellenarPDF(p);
 
     const el = document.getElementById('pdfPresupuesto');
     el.style.display = 'block';

@@ -1,6 +1,10 @@
 // ── CONTABILIDAD ─────────────────────────────────────────────
 
 document.getElementById('contNombre').innerText = sesion.username;
+API.get('/api/usuarios/nombres').then(lista => {
+    const yo = lista.find(u => u.username === sesion.username);
+    if (yo && yo.foto) document.getElementById('contAvatar').src = yo.foto;
+}).catch(() => {});
 
 let grafico = null;
 
