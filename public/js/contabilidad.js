@@ -1,5 +1,16 @@
 // ── CONTABILIDAD ─────────────────────────────────────────────
 
+/** Renderiza filas en una tabla. Si no hay datos muestra mensaje centrado. */
+function renderTabla(tbodyId, rows, cols, rowFn) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    if (!rows || rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center; color:#aaa; padding:12px;">Sin datos</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>${rowFn(r)}</tr>`).join('');
+}
+
 document.getElementById('contNombre').innerText = sesion.username;
 API.get('/api/usuarios/nombres').then(lista => {
     const yo = lista.find(u => u.username === sesion.username);
@@ -81,16 +92,22 @@ API.get('/api/contabilidad/resumen').then(data => {
     }
 
     // Horas por técnico
-    const tbody = document.getElementById('tablaHoras');
-    tbody.innerHTML = '';
-    if (data.horas_por_tecnico.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#aaa;">Sin datos</td></tr>';
-    } else {
-        data.horas_por_tecnico.forEach(t => {
-            tbody.innerHTML += `<tr>
-                <td>👷 ${t.tecnicos_nombres || '—'}</td>
-                <td><strong>${parseFloat(t.horas_totales).toFixed(1)} h</strong></td>
-            </tr>`;
-        });
-    }
+    renderTabla('tablaHoras', data.horas_por_tecnico, 2,
+        t => `<td>👷 ${t.tecnicos_nombres || '—'}</td><td><strong>${parseFloat(t.horas_totales).toFixed(1)} h</strong></td>`
+    );
+
+    // Top clientes por facturación
+    renderTabla('tablaClientesIngresos', data.clientes_ingresos, 3,
+        c => `<td>${c.cliente}</td><td style="text-align:center;">${c.num_facturas}</td><td><strong>${fmt(c.total_facturado)}</strong></td>`
+    );
+
+    // Clientes por materiales
+    renderTabla('tablaClientesMateriales', data.clientes_materiales, 3,
+        c => `<td>${c.cliente}</td><td style="text-align:center;">${c.num_ots}</td><td><strong>${fmt(c.total_materiales)}</strong></td>`
+    );
+
+    // Clientes por OTs
+    renderTabla('tablaClientesOTs', data.clientes_ots, 3,
+        c => `<td>${c.cliente}</td><td style="text-align:center;">${c.num_ots}</td><td style="text-align:center;">${c.ots_hechas}</td>`
+    );
 });

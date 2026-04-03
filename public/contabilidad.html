@@ -102,12 +102,39 @@
     </div>
 
     <!-- Técnicos -->
-    <div class="panel">
+    <div class="panel" id="panelHorasTecnico">
         <h3>Horas trabajadas por técnico (OTs completadas)</h3>
         <table class="tabla-tec">
             <thead><tr><th>Técnico(s)</th><th>Horas totales</th></tr></thead>
             <tbody id="tablaHoras"></tbody>
         </table>
+    </div>
+
+    <!-- Clientes: ingresos -->
+    <div class="panel" id="panelClientesIngresos">
+        <h3>Top clientes por facturación</h3>
+        <table class="tabla-tec">
+            <thead><tr><th>Cliente</th><th>Facturas</th><th>Total facturado</th></tr></thead>
+            <tbody id="tablaClientesIngresos"></tbody>
+        </table>
+    </div>
+
+    <!-- Clientes: materiales + OTs (2 columnas) -->
+    <div class="panel-grid" style="margin-bottom:20px;">
+        <div class="panel" id="panelClientesMateriales">
+            <h3>Clientes con más coste en materiales</h3>
+            <table class="tabla-tec">
+                <thead><tr><th>Cliente</th><th>OTs</th><th>Materiales</th></tr></thead>
+                <tbody id="tablaClientesMateriales"></tbody>
+            </table>
+        </div>
+        <div class="panel" id="panelClientesOTs">
+            <h3>Clientes por número de OTs</h3>
+            <table class="tabla-tec">
+                <thead><tr><th>Cliente</th><th>Total OTs</th><th>Completadas</th></tr></thead>
+                <tbody id="tablaClientesOTs"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 

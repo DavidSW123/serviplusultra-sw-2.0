@@ -48,6 +48,44 @@ async function getResumen(req, res) {
             ORDER BY horas_totales DESC
         `);
 
+        // Ranking clientes por facturación (ingresos base)
+        const rClientesIngresos = await db.execute(`
+            SELECT c.nombre AS cliente, COALESCE(SUM(f.base_imponible), 0) AS total_facturado,
+                   COUNT(f.id) AS num_facturas
+            FROM clientes c
+            LEFT JOIN ordenes_trabajo ot ON ot.cliente_id = c.id
+            LEFT JOIN facturas f ON f.ot_id = ot.id
+            GROUP BY c.id, c.nombre
+            HAVING total_facturado > 0
+            ORDER BY total_facturado DESC
+            LIMIT 10
+        `);
+
+        // Ranking clientes por coste de materiales
+        const rClientesMateriales = await db.execute(`
+            SELECT c.nombre AS cliente, COALESCE(SUM(a.importe), 0) AS total_materiales,
+                   COUNT(DISTINCT ot.id) AS num_ots
+            FROM clientes c
+            LEFT JOIN ordenes_trabajo ot ON ot.cliente_id = c.id
+            LEFT JOIN ot_adjuntos a ON a.ot_id = ot.id
+            GROUP BY c.id, c.nombre
+            HAVING total_materiales > 0
+            ORDER BY total_materiales DESC
+            LIMIT 10
+        `);
+
+        // OTs por cliente (conteo)
+        const rClientesOTs = await db.execute(`
+            SELECT c.nombre AS cliente, COUNT(ot.id) AS num_ots,
+                   SUM(CASE WHEN ot.estado='HECHO' THEN 1 ELSE 0 END) AS ots_hechas
+            FROM clientes c
+            LEFT JOIN ordenes_trabajo ot ON ot.cliente_id = c.id
+            GROUP BY c.id, c.nombre
+            HAVING num_ots > 0
+            ORDER BY num_ots DESC
+            LIMIT 10
+        `);
+
         // Totales globales facturación
         const rTotales = await db.execute(`
             SELECT
@@ -63,16 +101,19 @@ async function getResumen(req, res) {
 
         res.json({
             kpis: {
-                ingresos_base:    ingresos_base.toFixed(2),
-                ingresos_total:   ingresos_total.toFixed(2),
+                ingresos_base:     ingresos_base.toFixed(2),
+                ingresos_total:    ingresos_total.toFixed(2),
                 costes_materiales: costes_mat.toFixed(2),
                 gastos_generales:  gastos_gen.toFixed(2),
-                beneficio_bruto:  (ingresos_base - costes_mat).toFixed(2),
-                beneficio_neto:   (ingresos_base - costes_mat - gastos_gen).toFixed(2),
+                beneficio_bruto:   (ingresos_base - costes_mat).toFixed(2),
+                beneficio_neto:    (ingresos_base - costes_mat - gastos_gen).toFixed(2),
             },
-            evolucion_mensual: rFacturas.rows,
-            ots_por_estado:    rOTs.rows,
-            horas_por_tecnico: rHoras.rows,
+            evolucion_mensual:      rFacturas.rows,
+            ots_por_estado:         rOTs.rows,
+            horas_por_tecnico:      rHoras.rows,
+            clientes_ingresos:      rClientesIngresos.rows,
+            clientes_materiales:    rClientesMateriales.rows,
+            clientes_ots:           rClientesOTs.rows,
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
