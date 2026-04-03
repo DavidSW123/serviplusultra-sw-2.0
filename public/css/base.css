@@ -1,13 +1,31 @@
 /* ── BASE ────────────────────────────────────────────────────── */
-body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; padding: 20px; margin: 0; }
-.container { max-width: 950px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; padding: 16px; margin: 0; }
+.container { max-width: 950px; margin: auto; background: white; padding: 24px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
 h1, h2, h3 { color: #2c3e50; text-align: center; border-bottom: 2px solid #1abc9c; padding-bottom: 10px; }
+h1 { font-size: clamp(1.3em, 4vw, 1.8em); }
+h2 { font-size: clamp(1.1em, 3.5vw, 1.5em); }
+h3 { font-size: clamp(1em, 3vw, 1.2em); }
 
 /* ── FORMULARIOS ────────────────────────────────────────────── */
 .form-group { margin-bottom: 15px; }
 label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; }
-input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+input, select, textarea {
+    width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;
+    box-sizing: border-box; font-size: 16px; /* evita zoom en iOS */
+    font-family: inherit;
+}
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 
 /* ── UTILIDADES ─────────────────────────────────────────────── */
 .only-print { display: none; }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    body { padding: 8px; }
+    .container { padding: 14px; border-radius: 8px; }
+    .grid-2 { grid-template-columns: 1fr; gap: 10px; }
+}
+@media (max-width: 400px) {
+    body { padding: 4px; }
+    .container { padding: 10px; border-radius: 0; box-shadow: none; }
+}

@@ -10,11 +10,11 @@
     <link rel="stylesheet" href="/css/layout.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .top-bar-cont { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
-        .top-bar-cont a { color:#7f8c8d; text-decoration:none; font-size:0.9em; }
+        .top-bar-cont { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; gap:10px; flex-wrap:wrap; }
+        .top-bar-cont a { color:#7f8c8d; text-decoration:none; font-size:0.9em; white-space:nowrap; }
         .top-bar-cont a:hover { color:#1abc9c; }
 
-        .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:28px; }
+        .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px; }
         .kpi-card { background:#fff; border-radius:10px; padding:20px 24px; box-shadow:0 2px 8px rgba(0,0,0,0.07); border-left:4px solid #1abc9c; cursor:pointer; transition:transform 0.15s, box-shadow 0.15s; }
         .kpi-card:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,0.13); }
         .kpi-card.rojo   { border-color:#e74c3c; }
@@ -61,10 +61,25 @@
         .panel { cursor:pointer; transition:box-shadow 0.15s; }
         .panel:hover { box-shadow:0 4px 18px rgba(0,0,0,0.13); }
 
-        @media(max-width:768px) {
-            .kpi-grid   { grid-template-columns:1fr 1fr; }
+        @media(max-width:900px) {
             .panel-grid { grid-template-columns:1fr; }
-            .ots-grid   { grid-template-columns:1fr; }
+        }
+        @media(max-width:768px) {
+            .kpi-grid   { grid-template-columns:1fr 1fr; gap:10px; }
+            .ots-grid   { grid-template-columns:1fr 1fr; }
+            .kpi-valor  { font-size:1.3em; }
+            .panel      { padding:14px; }
+            .modal-detalle-content { padding:18px 14px; margin:2% auto; width:96%; }
+            .tabla-detalle th, .tabla-detalle td { padding:7px 8px; font-size:0.82em; }
+        }
+        @media(max-width:480px) {
+            .kpi-grid   { grid-template-columns:1fr; gap:8px; }
+            .ots-grid   { grid-template-columns:1fr 1fr 1fr; }
+            .kpi-label  { font-size:0.72em; }
+            .kpi-valor  { font-size:1.2em; }
+            .top-bar-cont h2 { font-size:1em; }
+            .modal-detalle { overflow-y:auto; }
+            .modal-detalle-content { overflow-x:auto; }
         }
     </style>
 </head>
