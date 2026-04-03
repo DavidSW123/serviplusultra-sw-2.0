@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contabilidad — ServiPlusUltra</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1abc9c">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .top-bar-cont { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
+        .top-bar-cont a { color:#7f8c8d; text-decoration:none; font-size:0.9em; }
+        .top-bar-cont a:hover { color:#1abc9c; }
+
+        .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:28px; }
+        .kpi-card { background:#fff; border-radius:10px; padding:20px 24px; box-shadow:0 2px 8px rgba(0,0,0,0.07); border-left:4px solid #1abc9c; }
+        .kpi-card.rojo   { border-color:#e74c3c; }
+        .kpi-card.azul   { border-color:#3498db; }
+        .kpi-card.naranja{ border-color:#e67e22; }
+        .kpi-card.verde-oscuro { border-color:#27ae60; }
+        .kpi-card.morado { border-color:#9b59b6; }
+        .kpi-label { font-size:0.8em; color:#7f8c8d; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+        .kpi-valor { font-size:1.7em; font-weight:bold; color:#2c3e50; }
+        .kpi-valor.positivo { color:#27ae60; }
+        .kpi-valor.negativo { color:#e74c3c; }
+
+        .panel-grid { display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:20px; }
+        .panel { background:#fff; border-radius:10px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.07); }
+        .panel h3 { margin:0 0 16px 0; font-size:1em; color:#2c3e50; border-bottom:2px solid #1abc9c; padding-bottom:8px; }
+
+        .ots-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; text-align:center; }
+        .ot-stat { padding:14px; border-radius:8px; }
+        .ot-stat .num { font-size:1.8em; font-weight:bold; }
+        .ot-stat .lbl { font-size:0.8em; color:#7f8c8d; margin-top:4px; }
+        .ot-stat.hecho    { background:#eafaf1; }
+        .ot-stat.pendiente{ background:#fef9e7; }
+        .ot-stat.anulado  { background:#fdedec; }
+
+        .tabla-tec { width:100%; border-collapse:collapse; font-size:0.9em; }
+        .tabla-tec th { background:#f8f9fa; padding:8px 10px; text-align:left; color:#7f8c8d; font-weight:600; border-bottom:1px solid #eee; }
+        .tabla-tec td { padding:8px 10px; border-bottom:1px solid #f0f0f0; }
+
+        @media(max-width:768px) {
+            .kpi-grid   { grid-template-columns:1fr 1fr; }
+            .panel-grid { grid-template-columns:1fr; }
+            .ots-grid   { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="top-bar-cont">
+        <a href="/">← Volver al inicio</a>
+        <h2 style="margin:0; border:none; padding:0; font-size:1.2em;">📊 Contabilidad</h2>
+        <span id="contNombre" style="font-size:0.9em; color:#7f8c8d;"></span>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+        <div class="kpi-card azul">
+            <div class="kpi-label">Ingresos facturados (sin IVA)</div>
+            <div class="kpi-valor" id="kpiIngresos">—</div>
+        </div>
+        <div class="kpi-card rojo">
+            <div class="kpi-label">Costes de materiales</div>
+            <div class="kpi-valor" id="kpiMateriales">—</div>
+        </div>
+        <div class="kpi-card naranja">
+            <div class="kpi-label">Gastos generales socios</div>
+            <div class="kpi-valor" id="kpiGastos">—</div>
+        </div>
+        <div class="kpi-card verde-oscuro">
+            <div class="kpi-label">Beneficio bruto</div>
+            <div class="kpi-valor" id="kpiBruto">—</div>
+        </div>
+        <div class="kpi-card morado">
+            <div class="kpi-label">Beneficio neto</div>
+            <div class="kpi-valor" id="kpiNeto">—</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total facturado (con IVA)</div>
+            <div class="kpi-valor" id="kpiTotalIva">—</div>
+        </div>
+    </div>
+
+    <!-- Gráfica + OTs -->
+    <div class="panel-grid">
+        <div class="panel">
+            <h3>Evolución mensual de ingresos</h3>
+            <canvas id="graficoMensual" height="120"></canvas>
+            <p id="sinDatos" style="text-align:center; color:#aaa; display:none; padding:20px;">Aún no hay facturas emitidas.</p>
+        </div>
+        <div class="panel">
+            <h3>Estado de las OTs</h3>
+            <div class="ots-grid" id="otsEstado"></div>
+        </div>
+    </div>
+
+    <!-- Técnicos -->
+    <div class="panel">
+        <h3>Horas trabajadas por técnico (OTs completadas)</h3>
+        <table class="tabla-tec">
+            <thead><tr><th>Técnico(s)</th><th>Horas totales</th></tr></thead>
+            <tbody id="tablaHoras"></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/contabilidad.js"></script>
+</body>
+</html>

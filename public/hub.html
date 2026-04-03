@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServiPlusUltra</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1abc9c">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+
+        .hub-header { text-align: center; margin-bottom: 40px; }
+        .hub-header img { width: 160px; margin-bottom: 16px; }
+        .hub-header h1 { color: #2c3e50; font-size: 1.6em; }
+        .hub-header p  { color: #7f8c8d; margin-top: 6px; }
+
+        .hub-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 820px; width: 100%; }
+
+        .hub-card {
+            background: white;
+            border-radius: 12px;
+            padding: 36px 24px;
+            text-align: center;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-top: 4px solid transparent;
+        }
+        .hub-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
+        .hub-card.contabilidad { border-color: #27ae60; }
+        .hub-card.facturas     { border-color: #3498db; }
+        .hub-card.presupuestos { border-color: #9b59b6; opacity: 0.6; cursor: not-allowed; }
+
+        .hub-card .icon  { font-size: 2.8em; margin-bottom: 14px; }
+        .hub-card h2     { font-size: 1.15em; color: #2c3e50; margin-bottom: 8px; }
+        .hub-card p      { font-size: 0.88em; color: #7f8c8d; line-height: 1.5; }
+        .hub-card .badge { display: inline-block; margin-top: 10px; font-size: 0.75em; background: #f0f0f0; padding: 3px 10px; border-radius: 20px; color: #aaa; }
+
+        .hub-user { position: absolute; top: 20px; right: 24px; font-size: 0.9em; color: #7f8c8d; }
+        .hub-user strong { color: #2c3e50; }
+        .hub-user a { color: #e74c3c; text-decoration: none; margin-left: 12px; font-size: 0.85em; }
+
+        @media (max-width: 600px) {
+            .hub-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="hub-user">
+        Hola, <strong id="hubNombre"></strong>
+        <a href="#" onclick="cerrarSesionHub()">Cerrar sesión</a>
+    </div>
+
+    <div class="hub-header">
+        <img src="/logo.png" onerror="this.style.display='none'">
+        <h1>ServiPlusUltra</h1>
+        <p id="hubRol"></p>
+    </div>
+
+    <div class="hub-grid">
+        <a class="hub-card contabilidad" href="/contabilidad">
+            <div class="icon">📊</div>
+            <h2>Contabilidad</h2>
+            <p>Ingresos, costes, beneficios y evolución del negocio</p>
+        </a>
+
+        <a class="hub-card facturas" href="/facturas">
+            <div class="icon">🛠️</div>
+            <h2>Facturas & OTs</h2>
+            <p>Órdenes de trabajo, materiales, clientes y facturación</p>
+        </a>
+
+        <div class="hub-card presupuestos" onclick="return false;">
+            <div class="icon">📋</div>
+            <h2>Presupuestos</h2>
+            <p>Generación y seguimiento de presupuestos para clientes</p>
+            <span class="badge">Próximamente</span>
+        </div>
+    </div>
+
+    <script>
+        const sesionStr = localStorage.getItem('sesionPlusUltra');
+        if (!sesionStr) window.location.href = '/login';
+        const sesion = JSON.parse(sesionStr);
+        document.getElementById('hubNombre').innerText = sesion.username;
+        document.getElementById('hubRol').innerText    = sesion.rol.charAt(0).toUpperCase() + sesion.rol.slice(1);
+        function cerrarSesionHub() { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; }
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+    </script>
+</body>
+</html>

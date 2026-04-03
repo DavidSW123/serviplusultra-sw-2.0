@@ -18,9 +18,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api', apiRoutes);
 
 // ── Páginas HTML ───────────────────────────────────────────────
-app.get('/',      (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/bbdd',  (_req, res) => res.sendFile(path.join(__dirname, 'public', 'bbdd.html')));
-app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/',              (_req, res) => res.sendFile(path.join(__dirname, 'public', 'hub.html')));
+app.get('/facturas',      (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/contabilidad',  (_req, res) => res.sendFile(path.join(__dirname, 'public', 'contabilidad.html')));
+app.get('/bbdd',          (_req, res) => res.sendFile(path.join(__dirname, 'public', 'bbdd.html')));
+app.get('/login',         (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
 // ── Arranque ───────────────────────────────────────────────────
 inicializarDB().then(() => {

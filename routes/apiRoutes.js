@@ -11,7 +11,8 @@ const stockController     = require('../controllers/stockController');
 const facturaController   = require('../controllers/facturaController');
 const gastosController    = require('../controllers/gastosController');
 const iaController        = require('../controllers/iaController');
-const logController       = require('../controllers/logController');
+const logController            = require('../controllers/logController');
+const contabilidadController   = require('../controllers/contabilidadController');
 
 // ============================================================
 // USUARIOS
@@ -73,6 +74,11 @@ router.post  ('/ia/escanear-ticket', autenticado, iaController.escanearTicket);
 // ============================================================
 // LOGS / AUDITORÍA
 // ============================================================
+// ============================================================
+// CONTABILIDAD
+// ============================================================
+router.get   ('/contabilidad/resumen', autenticado, contabilidadController.getResumen);
+
 router.get   ('/logs',            soloAdmin,   logController.getAll);
 router.put   ('/logs/:id',        autenticado, logController.editar);
 router.put   ('/logs/:id/resolver', soloAdmin, logController.resolver);
