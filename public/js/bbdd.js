@@ -34,7 +34,7 @@ async function cargarDatos() {
         dibujarTabla(datosBBDD);
     } catch (e) {
         document.getElementById('cuerpoTabla').innerHTML =
-            '<tr><td colspan="11" style="color:red; text-align:center;">Error cargando datos.</td></tr>';
+            '<tr><td colspan="12" style="color:red; text-align:center;">Error cargando datos.</td></tr>';
     }
 }
 
@@ -45,7 +45,7 @@ function dibujarTabla(datos) {
     tbody.innerHTML = '';
 
     if (datos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#7f8c8d; padding:30px;">No hay resultados con los filtros seleccionados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#7f8c8d; padding:30px;">No hay resultados con los filtros seleccionados.</td></tr>';
         return;
     }
 
@@ -76,6 +76,7 @@ function dibujarTabla(datos) {
             <td>${tecnicos}</td>
             <td>${ot.materiales_precio} €</td>
             <td><span class="badge" style="background-color:${colorEstado}; color:${colorTexto};">${ot.estado}</span></td>
+            <td style="color:${ot.numero_factura ? '#1abc9c' : '#ccc'}; font-weight:${ot.numero_factura ? 'bold' : 'normal'};">${ot.numero_factura || '—'}</td>
             ${celdaAcciones}
         </tr>`;
     });
@@ -179,16 +180,18 @@ function guardarEdicionOT() {
 // ── FILTROS ──────────────────────────────────────────────────
 
 function filtrarTabla() {
-    const textoOT    = document.getElementById('filtroOT').value.toLowerCase();
-    const textoMarca = document.getElementById('filtroMarca').value.toLowerCase();
+    const textoOT         = document.getElementById('filtroOT').value.toLowerCase();
+    const textoNumFactura = document.getElementById('filtroNumFactura').value.toLowerCase();
+    const textoMarca      = document.getElementById('filtroMarca').value.toLowerCase();
     const comboEstado  = document.getElementById('filtroEstado').value;
     const comboCliente = document.getElementById('filtroCliente').value;
     const fechaIni   = document.getElementById('filtroFechaInicio').value;
     const fechaFin   = document.getElementById('filtroFechaFin').value;
 
     const filtrados = datosBBDD.filter(ot => {
-        const coincideOT     = ot.codigo_ot.toLowerCase().includes(textoOT);
-        const coincideMarca  = ot.marca.toLowerCase().includes(textoMarca);
+        const coincideOT         = ot.codigo_ot.toLowerCase().includes(textoOT);
+        const coincideNumFactura = !textoNumFactura || (ot.numero_factura || '').toLowerCase().includes(textoNumFactura);
+        const coincideMarca      = ot.marca.toLowerCase().includes(textoMarca);
         const coincideEstado = comboEstado === 'TODOS' || ot.estado === comboEstado;
         const coincideCliente = comboCliente === 'TODOS' || String(ot.cliente_id) === comboCliente;
 
@@ -201,13 +204,14 @@ function filtrarTabla() {
             coincideFecha = false;
         }
 
-        return coincideOT && coincideMarca && coincideEstado && coincideCliente && coincideFecha;
+        return coincideOT && coincideNumFactura && coincideMarca && coincideEstado && coincideCliente && coincideFecha;
     });
     dibujarTabla(filtrados);
 }
 
 function borrarFiltros() {
     document.getElementById('filtroOT').value          = '';
+    document.getElementById('filtroNumFactura').value  = '';
     document.getElementById('filtroMarca').value       = '';
     document.getElementById('filtroEstado').value      = 'TODOS';
     document.getElementById('filtroCliente').value     = 'TODOS';
