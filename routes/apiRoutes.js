@@ -50,9 +50,11 @@ router.delete('/ot/adjuntos/:id',          soloAdmin,      otController.deleteAd
 // ============================================================
 // FACTURAS
 // ============================================================
-router.post  ('/factura',             autenticado, facturaController.emitir);
-router.post  ('/enviar-factura',      autenticado, facturaController.enviarEmail);
-router.post  ('/test-email',          autenticado, facturaController.testEmail);
+router.post  ('/factura',                    autenticado, facturaController.emitir);
+router.post  ('/factura/lineas',             autenticado, facturaController.actualizarLineas);
+router.post  ('/factura/desde-presupuesto',  autenticado, facturaController.emitirDesdePresupuesto);
+router.post  ('/enviar-factura',             autenticado, facturaController.enviarEmail);
+router.post  ('/test-email',                 autenticado, facturaController.testEmail);
 
 // ============================================================
 // GASTOS SOCIOS (Splitwise)
@@ -88,8 +90,9 @@ router.post  ('/presupuestos',              autenticado,    presupuestosControll
 router.put   ('/presupuestos/:id',          soloAdmin,      presupuestosController.editar);
 router.put   ('/presupuestos/:id/estado',   autenticado,    presupuestosController.cambiarEstado);
 router.delete('/presupuestos/:id',          soloAdmin,      presupuestosController.eliminar);
-router.post  ('/presupuestos/:id/convertir',soloAdmin,      presupuestosController.convertirAOT);
-router.post  ('/presupuestos/:id/email',    soloAdmin,      presupuestosController.enviarEmail);
+router.post  ('/presupuestos/:id/convertir',  soloAdmin,   presupuestosController.convertirAOT);
+router.post  ('/presupuestos/:id/email',      soloAdmin,   presupuestosController.enviarEmail);
+router.put   ('/presupuestos/:id/asociar-ot', soloAdmin,   presupuestosController.asociarOT);
 
 router.get   ('/logs',            soloAdmin,   logController.getAll);
 router.put   ('/logs/:id',        autenticado, logController.editar);

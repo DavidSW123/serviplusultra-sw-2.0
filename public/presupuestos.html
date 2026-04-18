@@ -74,12 +74,17 @@
         .btn-pdf:hover { background:#8e44ad; }
         .btn-eliminar  { background:#fff0f0; color:#e74c3c; border:1px solid #e74c3c !important; }
         .btn-eliminar:hover { background:#fdedec; }
+        .btn-proforma  { background:#ebf5fb; color:#2980b9; border:1px solid #aed6f1 !important; }
+        .btn-proforma:hover { background:#d6eaf8; }
+        .btn-ffinal    { background:#eafaf1; color:#27ae60; border:1px solid #a9dfbf !important; }
+        .btn-ffinal:hover { background:#d5f5e3; }
 
         /* Modal presupuesto */
         .modal-lineas { margin-top:14px; }
-        .linea-pres { display:grid; grid-template-columns:1fr 110px auto; gap:8px; align-items:center; margin-bottom:8px; }
-        .linea-pres input { padding:8px 10px; border:1px solid #ddd; border-radius:6px; font-size:15px; min-height:40px; }
-        .linea-pres .btn-rm { background:#fdedec; color:#e74c3c; border:none; border-radius:6px; padding:8px 10px; cursor:pointer; font-weight:bold; min-height:40px; }
+        .linea-pres { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:nowrap; }
+        .linea-pres .lp-desc { flex:1 1 0; min-width:0; padding:8px 10px; border:1px solid #ddd; border-radius:6px; font-size:15px; min-height:40px; box-sizing:border-box; }
+        .linea-pres .lp-importe { flex:0 0 110px; width:110px; padding:8px 10px; border:1px solid #ddd; border-radius:6px; font-size:15px; min-height:40px; box-sizing:border-box; }
+        .linea-pres .btn-rm { flex:0 0 auto; background:#fdedec; color:#e74c3c; border:none; border-radius:6px; padding:8px 12px; cursor:pointer; font-weight:bold; min-height:40px; white-space:nowrap; }
         .btn-add-linea { background:#eafaf1; color:#27ae60; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:0.88em; font-weight:600; margin-top:4px; min-height:40px; }
 
         .resumen-pres { background:#f8f9fa; border-radius:8px; padding:12px 16px; margin-top:14px; font-size:0.9em; }
@@ -97,7 +102,7 @@
         @media(max-width:480px){
             .top-bar-pres h2 { font-size:1em; }
             .pres-acciones button { flex:1 1 40%; }
-            .linea-pres { grid-template-columns:1fr 90px auto; gap:6px; }
+            .linea-pres .lp-importe { flex:0 0 90px; width:90px; }
         }
     </style>
 </head>
@@ -195,7 +200,7 @@
     <!-- Cabecera con franja de color -->
     <div style="background:#2c3e50; padding:28px 36px 20px 36px; display:flex; justify-content:space-between; align-items:center;">
         <div>
-            <img src="/logo.png" style="max-height:56px; max-width:180px;" onerror="this.style.display='none'">
+            <img id="pdfLogo" src="/logo.png" style="max-height:56px; max-width:180px;" onerror="this.style.display='none'">
         </div>
         <div style="text-align:right; color:#fff;">
             <div style="font-size:2em; font-weight:bold; letter-spacing:2px; color:#1abc9c;">PRESUPUESTO</div>
@@ -285,6 +290,106 @@
         </div>
     </div>
 
+</div>
+</div>
+
+<!-- Modal: Emitir factura proforma / final -->
+<div class="modal" id="modalEmitirFacturaPres" style="display:none;">
+    <div class="modal-content" style="max-width:420px; text-align:center;">
+        <h3 id="emitirFactPresTitle">Emitir factura</h3>
+        <input type="hidden" id="emitirFactPresId">
+        <input type="hidden" id="emitirFactPresTipo">
+        <p id="emitirFactPresDesc" style="color:#7f8c8d; font-size:0.9em; margin:10px 0 20px 0;"></p>
+        <div style="display:flex; gap:10px; justify-content:center;">
+            <button class="btn-secondary" onclick="cerrarModal('modalEmitirFacturaPres')">Cancelar</button>
+            <button class="btn-primary" style="background:#1abc9c;" onclick="confirmarEmitirFacturaPres()">✅ Emitir y descargar PDF</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Asociar a OT -->
+<div class="modal" id="modalAsociarOT" style="display:none;">
+    <div class="modal-content" style="max-width:600px;">
+        <h3>🔗 Asociar a una Orden de Trabajo</h3>
+        <input type="hidden" id="asociarPresId">
+        <input type="text" id="buscarOTInput" placeholder="Buscar OT por código, cliente, marca..." oninput="buscarOTsParaAsociar()" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:15px; box-sizing:border-box; margin-bottom:12px;">
+        <div id="listaOTsBusqueda" style="max-height:320px; overflow-y:auto; border:1px solid #eee; border-radius:6px;"></div>
+        <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+            <button class="btn-secondary" onclick="cerrarModal('modalAsociarOT')">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Template oculto: Factura desde presupuesto (proforma o final) -->
+<div id="pdfFacturaPres" style="display:none;">
+<div style="font-family:Arial,sans-serif; width:210mm; min-height:297mm; margin:0; padding:0; color:#2c3e50; background:#fff; box-sizing:border-box;">
+    <div style="background:#2c3e50; padding:28px 36px 20px 36px; display:flex; justify-content:space-between; align-items:center;">
+        <div><img id="pdfFactPresLogo" src="/logo.png" style="max-height:56px; max-width:180px;" onerror="this.style.display='none'"></div>
+        <div style="text-align:right; color:#fff;">
+            <div style="font-size:1.8em; font-weight:bold; letter-spacing:2px; color:#1abc9c;" id="pdfFactPresTitulo">FACTURA</div>
+            <div style="font-size:1em; font-weight:600; margin-top:4px;" id="pdfFactPresNumero">—</div>
+            <div style="font-size:0.82em; color:#bdc3c7; margin-top:2px;" id="pdfFactPresFecha">—</div>
+            <div style="font-size:0.75em; color:#7f8c8d; margin-top:2px;">Ref. Presupuesto: <span id="pdfFactPresRef">—</span></div>
+        </div>
+    </div>
+    <div style="background:#1abc9c; height:4px;"></div>
+    <div style="display:flex; gap:0; border-bottom:1px solid #eee;">
+        <div style="flex:1; padding:20px 36px; border-right:1px solid #eee;">
+            <div style="font-size:0.7em; color:#9b59b6; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:6px;">Emisor</div>
+            <div style="font-weight:700; font-size:1em; color:#2c3e50;">ServiPlusUltra Solutions S.L.</div>
+            <div style="font-size:0.82em; color:#7f8c8d; margin-top:2px;">NIF: B-26892760</div>
+            <div style="font-size:0.82em; color:#7f8c8d;">Carrer d'Aribau 168, 1-1 · 08036 Barcelona</div>
+        </div>
+        <div style="flex:1; padding:20px 36px;">
+            <div style="font-size:0.7em; color:#9b59b6; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:6px;">Facturar a</div>
+            <div style="font-weight:700; font-size:1em; color:#2c3e50;" id="pdfFactPresCliente">—</div>
+            <div style="font-size:0.82em; color:#7f8c8d; margin-top:2px;" id="pdfFactPresClienteNif"></div>
+            <div style="font-size:0.82em; color:#7f8c8d;" id="pdfFactPresClienteDir"></div>
+        </div>
+    </div>
+    <div style="padding:20px 36px;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.88em;">
+            <thead>
+                <tr style="background:#2c3e50; color:#fff;">
+                    <th style="padding:10px 14px; text-align:left; font-weight:600;">Concepto</th>
+                    <th style="padding:10px 14px; text-align:right; font-weight:600; width:130px;">Importe (€)</th>
+                </tr>
+            </thead>
+            <tbody id="pdfFactPresLineas"></tbody>
+        </table>
+        <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+            <div style="width:260px;">
+                <div style="display:flex; justify-content:space-between; padding:7px 14px; background:#f8f9fa; border-radius:4px 4px 0 0; font-size:0.88em;">
+                    <span style="color:#7f8c8d;">Base imponible</span>
+                    <span style="font-weight:600;" id="pdfFactPresBase">—</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:7px 14px; background:#f0f0f0; font-size:0.88em;">
+                    <span style="color:#7f8c8d;">IVA (21%)</span>
+                    <span style="font-weight:600;" id="pdfFactPresIva">—</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; padding:10px 14px; background:#2c3e50; border-radius:0 0 4px 4px; color:#fff;">
+                    <span style="font-weight:700; font-size:0.95em;">TOTAL</span>
+                    <span style="font-weight:700; font-size:1.05em; color:#1abc9c;" id="pdfFactPresTotal">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="pdfFactPresNotaProforma" style="padding:0 36px 16px 36px; display:none;">
+        <div style="background:#fffbe6; border-left:3px solid #f39c12; padding:10px 14px; border-radius:0 4px 4px 0; font-size:0.82em; color:#7f8c8d;">
+            <strong style="color:#e67e22;">Nota:</strong> Esta es una <strong>factura proforma</strong>. El importe restante se facturará en la factura final.
+        </div>
+    </div>
+    <div style="margin:0 36px; border-top:2px solid #1abc9c; padding-top:14px; padding-bottom:28px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+            <div style="font-size:0.75em; color:#aaa;">
+                <div>Fecha de vencimiento: 30 días desde la fecha de emisión.</div>
+            </div>
+            <div style="text-align:right; font-size:0.75em; color:#aaa;">
+                <div style="font-weight:600; color:#2c3e50;">ServiPlusUltra Solutions S.L.</div>
+                <div>B-26892760 · Barcelona</div>
+            </div>
+        </div>
+    </div>
 </div>
 </div>
 

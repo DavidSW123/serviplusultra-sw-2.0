@@ -187,4 +187,21 @@ async function enviarEmail(req, res) {
     }
 }
 
-module.exports = { getAll, crear, editar, cambiarEstado, eliminar, convertirAOT, enviarEmail };
+/** PUT /api/presupuestos/:id/asociar-ot   Body: { ot_id, ot_codigo } */
+async function asociarOT(req, res) {
+    const { id } = req.params;
+    const { ot_id, ot_codigo } = req.body;
+    const usuario = req.headers['x-user'] || 'desconocido';
+    try {
+        await db.execute({
+            sql:  `UPDATE presupuestos SET ot_asociada_id=?, ot_asociada_codigo=? WHERE id=?`,
+            args: [ot_id || null, ot_codigo || null, id]
+        });
+        await registrarLog(usuario, 'Asociar presupuesto a OT', `ID:${id}`, { ot_codigo });
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+module.exports = { getAll, crear, editar, cambiarEstado, eliminar, convertirAOT, enviarEmail, asociarOT };

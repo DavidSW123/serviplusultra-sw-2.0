@@ -113,4 +113,67 @@ async function testEmail(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail };
+/**
+ * POST /api/factura/lineas
+ * Body: { ot_id, lineas }
+ * Guarda las líneas modificadas en la factura existente.
+ */
+async function actualizarLineas(req, res) {
+    const { ot_id, lineas } = req.body;
+    try {
+        await db.execute({
+            sql:  `UPDATE facturas SET lineas=? WHERE ot_id=?`,
+            args: [JSON.stringify(lineas || []), ot_id]
+        });
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ error: 'Error al guardar líneas: ' + e.message });
+    }
+}
+
+/**
+ * POST /api/factura/desde-presupuesto
+ * Body: { presupuesto_id, tipo ('proforma'|'final'), base_imponible, iva, total, lineas }
+ * Genera número secuencial y registra la factura vinculada al presupuesto.
+ */
+async function emitirDesdePresupuesto(req, res) {
+    const { presupuesto_id, tipo, base_imponible, iva, total, lineas } = req.body;
+    if (!['proforma', 'final'].includes(tipo)) return res.status(400).json({ error: 'tipo inválido' });
+
+    try {
+        // Idempotente: si ya existe, devuelve la existente
+        const campo = tipo === 'proforma' ? 'proforma_numero' : 'factura_final_numero';
+        const { rows: pRows } = await db.execute({
+            sql:  `SELECT ${campo} FROM presupuestos WHERE id=?`,
+            args: [presupuesto_id]
+        });
+        if (pRows[0] && pRows[0][campo]) {
+            return res.json({ numero_factura: pRows[0][campo], yaExistia: true });
+        }
+
+        const fecha          = new Date().toISOString().split('T')[0];
+        const numero_factura = await generarNumeroFactura();
+
+        await db.execute({
+            sql:  `INSERT INTO facturas (presupuesto_id, base_imponible, iva, total, fecha_emision, numero_factura, lineas)
+                   VALUES (?,?,?,?,?,?,?)`,
+            args: [presupuesto_id, base_imponible, iva, total, fecha, numero_factura, JSON.stringify(lineas || [])]
+        });
+
+        const campoTotal = tipo === 'proforma' ? ', proforma_total=?' : '';
+        const args = tipo === 'proforma'
+            ? [numero_factura, total, presupuesto_id]
+            : [numero_factura, presupuesto_id];
+
+        await db.execute({
+            sql:  `UPDATE presupuestos SET ${campo}=?${campoTotal} WHERE id=?`,
+            args
+        });
+
+        res.json({ ok: true, numero_factura, fecha_emision: fecha });
+    } catch (e) {
+        res.status(500).json({ error: 'Error al emitir desde presupuesto: ' + e.message });
+    }
+}
+
+module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto };

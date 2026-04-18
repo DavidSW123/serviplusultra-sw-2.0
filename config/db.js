@@ -114,7 +114,14 @@ async function inicializarDB() {
             `ALTER TABLE gastos_socios ADD COLUMN implicados TEXT DEFAULT 'Giancarlo,David,Kevin'`,
             `UPDATE usuarios SET rol = 'admin' WHERE username = 'David' AND rol = 'director'`,
             `ALTER TABLE ordenes_trabajo ADD COLUMN precio_hora REAL DEFAULT 15`,
-            `ALTER TABLE facturas ADD COLUMN numero_factura TEXT`
+            `ALTER TABLE facturas ADD COLUMN numero_factura TEXT`,
+            `ALTER TABLE facturas ADD COLUMN lineas TEXT`,
+            `ALTER TABLE facturas ADD COLUMN presupuesto_id INTEGER`,
+            `ALTER TABLE presupuestos ADD COLUMN proforma_numero TEXT`,
+            `ALTER TABLE presupuestos ADD COLUMN proforma_total REAL`,
+            `ALTER TABLE presupuestos ADD COLUMN factura_final_numero TEXT`,
+            `ALTER TABLE presupuestos ADD COLUMN ot_asociada_id INTEGER`,
+            `ALTER TABLE presupuestos ADD COLUMN ot_asociada_codigo TEXT`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }
