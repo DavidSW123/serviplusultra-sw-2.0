@@ -97,7 +97,38 @@ async function abrirGeneradorFactura(id) {
     }
 
     renderizarTablaFactura();
+    _renderBadgeEnviada(ot.factura_emails_enviados);
     abrirModal('modalFactura');
+}
+
+/** Muestra badge "Enviada X veces" al lado de #factNumero si hay envíos registrados. */
+function _renderBadgeEnviada(emailsJson) {
+    const badge = document.getElementById('badgeFactEnviada');
+    if (!badge) return;
+    let arr = [];
+    try { arr = JSON.parse(emailsJson || '[]'); } catch { arr = []; }
+    window._emailsEnviadosActual = arr;
+    if (arr.length === 0) {
+        badge.style.display = 'none';
+        return;
+    }
+    badge.style.display = 'inline-block';
+    badge.innerText = `📧 Enviada ${arr.length} ${arr.length === 1 ? 'vez' : 'veces'}`;
+}
+
+/** Abre popup con historial de envíos de la factura actual. */
+function verHistorialEnvios() {
+    const arr = window._emailsEnviadosActual || [];
+    const cont = document.getElementById('tbodyHistorialEnvios');
+    if (!cont) return;
+    if (arr.length === 0) {
+        cont.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#888;">Sin envíos registrados</td></tr>';
+    } else {
+        cont.innerHTML = arr.map((e, i) =>
+            `<tr><td>${i + 1}</td><td>${e.email || '-'}</td><td>${e.fecha || '-'}</td></tr>`
+        ).join('');
+    }
+    abrirModal('modalHistorialEnvios');
 }
 
 function _construirLineasDesdeOT(ot) {
@@ -272,11 +303,24 @@ async function enviarFacturaAlCliente() {
         document.getElementById('printClienteNombre').style.display = 'none';
 
         API.post('/api/enviar-factura', {
+            ot_id:         otActualId,
             emailDestino:  cliente.email,
             asunto:        `Factura ${numFactura} - ServiPlusUltra`,
             htmlBody:      `<div style="font-family:Arial;padding:20px;"><h2>Hola, ${cliente.nombre}</h2><p>Adjuntamos la factura <strong>${numFactura}</strong> de la OT <strong>${otActualCodigo}</strong>.</p></div>`,
             pdfBase64:     pdfDataUrl.split(',')[1],
             nombreArchivo: `Factura-${numFactura}.pdf`
-        }).then(data => { if (data.error) alert('❌ ' + data.error); else alert('✅ ' + data.mensaje); });
+        }).then(async data => {
+            if (data.error) { alert('❌ ' + data.error); return; }
+            alert('✅ ' + data.mensaje);
+            // Refrescar otsGlobal para que aparezca el badge al reabrir
+            try {
+                const frescas = await API.get('/api/ot');
+                if (Array.isArray(frescas)) {
+                    otsGlobal = frescas;
+                    const otFresh = otsGlobal.find(o => o.id === otActualId);
+                    if (otFresh) _renderBadgeEnviada(otFresh.factura_emails_enviados);
+                }
+            } catch (_) {}
+        });
     });
 }

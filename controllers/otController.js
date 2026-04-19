@@ -40,7 +40,7 @@ async function _insertarMateriales(otId, lineas) {
 async function getAll(req, res) {
     try {
         const result = await db.execute(
-            `SELECT ot.*, f.numero_factura, f.fecha_emision AS factura_fecha_emision, f.lineas AS factura_lineas
+            `SELECT ot.*, f.numero_factura, f.fecha_emision AS factura_fecha_emision, f.lineas AS factura_lineas, f.emails_enviados AS factura_emails_enviados
              FROM ordenes_trabajo ot
              LEFT JOIN facturas f ON f.ot_id = ot.id
              ORDER BY ot.id DESC`

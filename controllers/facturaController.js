@@ -75,7 +75,7 @@ async function emitir(req, res) {
  * Body: { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo }
  */
 async function enviarEmail(req, res) {
-    const { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo } = req.body;
+    const { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo, ot_id } = req.body;
     try {
         await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
@@ -87,6 +87,26 @@ async function enviarEmail(req, res) {
                 adjuntoNombre: nombreArchivo
             })
         });
+
+        // Registrar envío en facturas.emails_enviados si hay ot_id
+        if (ot_id) {
+            try {
+                const { rows } = await db.execute({
+                    sql:  `SELECT emails_enviados FROM facturas WHERE ot_id = ?`,
+                    args: [ot_id]
+                });
+                if (rows[0]) {
+                    let arr = [];
+                    try { arr = JSON.parse(rows[0].emails_enviados || '[]'); } catch { arr = []; }
+                    arr.push({ email: emailDestino, fecha: new Date().toLocaleString('es-ES') });
+                    await db.execute({
+                        sql:  `UPDATE facturas SET emails_enviados=? WHERE ot_id=?`,
+                        args: [JSON.stringify(arr), ot_id]
+                    });
+                }
+            } catch (_) { /* no bloquear respuesta si falla el tracking */ }
+        }
+
         res.json({ mensaje: 'Factura enviada con éxito al cliente por correo electrónico.' });
     } catch (e) {
         res.status(500).json({ error: 'Fallo de conexión al enviar la factura.' });

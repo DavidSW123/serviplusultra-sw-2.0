@@ -121,7 +121,8 @@ async function inicializarDB() {
             `ALTER TABLE presupuestos ADD COLUMN proforma_total REAL`,
             `ALTER TABLE presupuestos ADD COLUMN factura_final_numero TEXT`,
             `ALTER TABLE presupuestos ADD COLUMN ot_asociada_id INTEGER`,
-            `ALTER TABLE presupuestos ADD COLUMN ot_asociada_codigo TEXT`
+            `ALTER TABLE presupuestos ADD COLUMN ot_asociada_codigo TEXT`,
+            `ALTER TABLE facturas ADD COLUMN emails_enviados TEXT`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }
