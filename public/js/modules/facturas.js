@@ -62,7 +62,7 @@ function _calcularTarifas(ot) {
     if (esNocturno)                                         return { pHora: 55, pDesp: 55, motivo: 'NOCTURNO' };
     if (esExtralaboral)                                     return { pHora: 55, pDesp: 55, motivo: 'EXTRALABORAL' };
     if (esUrgente)                                          return { pHora: 55, pDesp: 55, motivo: 'URGENTE' };
-    return { pHora: 30, pDesp: 40, motivo: 'NORMAL' };
+    return { pHora: 30, pDesp: 35, motivo: 'NORMAL' };
 }
 
 // ── Modal ─────────────────────────────────────────────────────
