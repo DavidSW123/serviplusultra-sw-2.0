@@ -9,6 +9,13 @@ const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
  * Formato: XX-YYYYMMDD  (XX crece a 3/4 dígitos automáticamente)
  * El contador se reinicia cada año.
  */
+/**
+ * Genera el siguiente número de factura del año.
+ * IMPORTANTE (cumplimiento legal): rellena huecos en la secuencia.
+ * Si se generó la 14 y luego se borró el registro, la próxima factura
+ * recibirá la 14 (en lugar de saltar a 15+) para que NUNCA queden
+ * números huérfanos en la secuencia anual.
+ */
 async function generarNumeroFactura() {
     const hoy  = new Date();
     const year = hoy.getFullYear();
@@ -16,14 +23,18 @@ async function generarNumeroFactura() {
     const dd   = String(hoy.getDate()).padStart(2, '0');
 
     const { rows } = await db.execute({
-        sql:  `SELECT MAX(CAST(SUBSTR(numero_factura, 1, INSTR(numero_factura, '-') - 1) AS INTEGER)) AS max_seq
+        sql:  `SELECT CAST(SUBSTR(numero_factura, 1, INSTR(numero_factura, '-') - 1) AS INTEGER) AS seq
                FROM facturas
                WHERE numero_factura IS NOT NULL
-                 AND SUBSTR(numero_factura, INSTR(numero_factura, '-') + 1, 4) = ?`,
+                 AND SUBSTR(numero_factura, INSTR(numero_factura, '-') + 1, 4) = ?
+               ORDER BY seq ASC`,
         args: [String(year)]
     });
 
-    const seq    = (rows[0].max_seq || 0) + 1;
+    const usados = new Set(rows.map(r => r.seq));
+    let seq = 1;
+    while (usados.has(seq)) seq++;
+
     const seqStr = seq < 100 ? String(seq).padStart(2, '0') : String(seq);
     return `${seqStr}-${year}${mm}${dd}`;
 }
