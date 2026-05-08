@@ -22,6 +22,20 @@ async function generarNumeroFactura() {
     const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
     const dd   = String(hoy.getDate()).padStart(2, '0');
 
+    // Limpieza inline: liberar números de facturas huérfanas (sin OT ni presupuesto vivo)
+    try {
+        await db.execute(`
+            DELETE FROM facturas
+            WHERE id IN (
+                SELECT f.id FROM facturas f
+                LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
+                LEFT JOIN presupuestos    p  ON p.id  = f.presupuesto_id
+                WHERE (f.ot_id IS NULL OR ot.id IS NULL)
+                  AND (f.presupuesto_id IS NULL OR p.id IS NULL)
+            )
+        `);
+    } catch (_) { /* tabla aún no inicializada, ok */ }
+
     const { rows } = await db.execute({
         sql:  `SELECT CAST(SUBSTR(numero_factura, 1, INSTR(numero_factura, '-') - 1) AS INTEGER) AS seq
                FROM facturas
@@ -232,4 +246,28 @@ async function purgarHuerfanas(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas };
+/**
+ * GET /api/facturas/diagnostico
+ * Lista todas las facturas con su contexto (OT viva, presupuesto vivo).
+ * Útil para encontrar facturas "fantasma" que ocupan número.
+ */
+async function diagnostico(req, res) {
+    try {
+        const { rows } = await db.execute(`
+            SELECT f.id, f.numero_factura, f.ot_id, f.presupuesto_id,
+                   ot.codigo_ot AS ot_codigo,
+                   p.referencia AS presupuesto_ref,
+                   CASE WHEN f.ot_id IS NOT NULL AND ot.id IS NULL THEN 1 ELSE 0 END AS ot_huerfana,
+                   CASE WHEN f.presupuesto_id IS NOT NULL AND p.id IS NULL THEN 1 ELSE 0 END AS pres_huerfano
+            FROM facturas f
+            LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
+            LEFT JOIN presupuestos    p  ON p.id  = f.presupuesto_id
+            ORDER BY f.numero_factura
+        `);
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico };

@@ -54,6 +54,7 @@ router.post  ('/factura',                    autenticado, facturaController.emit
 router.post  ('/factura/lineas',             autenticado, facturaController.actualizarLineas);
 router.post  ('/factura/desde-presupuesto',  autenticado, facturaController.emitirDesdePresupuesto);
 router.post  ('/facturas/purgar-huerfanas',  soloAdmin,   facturaController.purgarHuerfanas);
+router.get   ('/facturas/diagnostico',       soloAdmin,   facturaController.diagnostico);
 router.post  ('/enviar-factura',             autenticado, facturaController.enviarEmail);
 router.post  ('/test-email',                 autenticado, facturaController.testEmail);
 
