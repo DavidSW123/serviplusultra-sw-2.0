@@ -96,6 +96,8 @@ async function eliminar(req, res) {
     try {
         const { rows } = await db.execute({ sql: `SELECT referencia FROM presupuestos WHERE id=?`, args: [id] });
         const ref = rows[0]?.referencia || id;
+        // Borrar facturas vinculadas (proforma/final) para liberar sus números y que el gap-fill los reasigne
+        await db.execute({ sql: `DELETE FROM facturas WHERE presupuesto_id=?`, args: [id] });
         await db.execute({ sql: `DELETE FROM presupuestos WHERE id=?`, args: [id] });
         await registrarLog(usuario, 'Eliminar presupuesto', ref, { id });
         res.json({ ok: true });

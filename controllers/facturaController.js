@@ -207,4 +207,29 @@ async function emitirDesdePresupuesto(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto };
+/**
+ * POST /api/facturas/purgar-huerfanas
+ * Elimina facturas cuyo ot_id apunta a una OT inexistente
+ * y cuyo presupuesto_id apunta a un presupuesto inexistente (o ambos NULL).
+ * Libera esos números para que el gap-fill los reasigne en la próxima emisión.
+ */
+async function purgarHuerfanas(req, res) {
+    try {
+        const { rows: huerfanas } = await db.execute(`
+            SELECT f.id, f.numero_factura
+            FROM facturas f
+            LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
+            LEFT JOIN presupuestos    p  ON p.id  = f.presupuesto_id
+            WHERE (f.ot_id IS NULL OR ot.id IS NULL)
+              AND (f.presupuesto_id IS NULL OR p.id IS NULL)
+        `);
+        for (const h of huerfanas) {
+            await db.execute({ sql: `DELETE FROM facturas WHERE id=?`, args: [h.id] });
+        }
+        res.json({ ok: true, eliminadas: huerfanas.length, numeros: huerfanas.map(h => h.numero_factura) });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas };
