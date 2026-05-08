@@ -206,4 +206,30 @@ async function asociarOT(req, res) {
     }
 }
 
-module.exports = { getAll, crear, editar, cambiarEstado, eliminar, convertirAOT, enviarEmail, asociarOT };
+/** DELETE /api/presupuestos/:id/factura/:tipo  (tipo: proforma | final) */
+async function eliminarFacturaAsociada(req, res) {
+    const { id, tipo } = req.params;
+    const usuario = req.headers['x-user'] || 'desconocido';
+    if (!['proforma', 'final'].includes(tipo)) return res.status(400).json({ error: 'tipo inválido' });
+    try {
+        const campoNumero = tipo === 'proforma' ? 'proforma_numero'      : 'factura_final_numero';
+        const setExtra    = tipo === 'proforma' ? ', proforma_total=NULL' : '';
+
+        const { rows } = await db.execute({
+            sql:  `SELECT ${campoNumero} AS num FROM presupuestos WHERE id=?`,
+            args: [id]
+        });
+        const num = rows[0]?.num;
+        if (!num) return res.status(404).json({ error: 'No hay factura de ese tipo asociada' });
+
+        // Borra la factura (libera su número) y limpia los campos del presupuesto
+        await db.execute({ sql: `DELETE FROM facturas WHERE numero_factura=? AND presupuesto_id=?`, args: [num, id] });
+        await db.execute({ sql: `UPDATE presupuestos SET ${campoNumero}=NULL${setExtra} WHERE id=?`, args: [id] });
+        await registrarLog(usuario, `Eliminar factura ${tipo} de presupuesto`, `ID:${id}`, { numero: num });
+        res.json({ ok: true, numero_eliminado: num });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+module.exports = { getAll, crear, editar, cambiarEstado, eliminar, convertirAOT, enviarEmail, asociarOT, eliminarFacturaAsociada };

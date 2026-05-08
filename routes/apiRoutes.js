@@ -95,6 +95,7 @@ router.delete('/presupuestos/:id',          soloAdmin,      presupuestosControll
 router.post  ('/presupuestos/:id/convertir',  soloAdmin,   presupuestosController.convertirAOT);
 router.post  ('/presupuestos/:id/email',      soloAdmin,   presupuestosController.enviarEmail);
 router.put   ('/presupuestos/:id/asociar-ot', soloAdmin,   presupuestosController.asociarOT);
+router.delete('/presupuestos/:id/factura/:tipo', soloAdmin, presupuestosController.eliminarFacturaAsociada);
 
 router.get   ('/logs',            soloAdmin,   logController.getAll);
 router.put   ('/logs/:id',        autenticado, logController.editar);

@@ -113,8 +113,8 @@ function _accionesPorEstado(p, estado) {
     if (['ACEPTADO','CONVERTIDO'].includes(estado) && esAdmin) {
         btns += `<button class="btn-editar" onclick="abrirAsociarOT(${id})">🔗 OT</button>`;
     }
-    if ((estado === 'BORRADOR' || estado === 'RECHAZADO') && esAdmin) {
-        btns += `<button class="btn-eliminar" onclick="eliminarPresupuesto(${id})">Eliminar</button>`;
+    if (esAdmin) {
+        btns += `<button class="btn-eliminar" onclick="eliminarPresupuesto(${id})">🗑️ Eliminar</button>`;
     }
     return btns;
 }
@@ -147,6 +147,8 @@ function abrirNuevoPresupuesto() {
     document.getElementById('presCliente').value        = '';
     document.getElementById('presDescripcion').value    = '';
     document.getElementById('presNotas').value          = '';
+    document.getElementById('presFacturasAsociadas').style.display = 'none';
+    document.getElementById('btnEliminarPresModal').style.display  = 'none';
     _renderLineasPres();
     _calcularResumen();
     document.getElementById('modalPresupuesto').style.display = 'flex';
@@ -163,7 +165,62 @@ function abrirEditarPresupuesto(id) {
     document.getElementById('presNotas').value            = p.notas || '';
     _renderLineasPres();
     _calcularResumen();
+    _renderFacturasAsociadas(p);
+    document.getElementById('btnEliminarPresModal').style.display = esAdmin ? 'inline-block' : 'none';
     document.getElementById('modalPresupuesto').style.display = 'flex';
+}
+
+function _renderFacturasAsociadas(p) {
+    const wrap = document.getElementById('presFacturasAsociadas');
+    const cont = document.getElementById('presFacturasLista');
+    const items = [];
+    if (p.proforma_numero) {
+        items.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#ebf5fb; border-radius:6px; margin-bottom:6px;">
+            <span><strong>Proforma:</strong> ${p.proforma_numero} ${p.proforma_total ? `(${fmtP(p.proforma_total)})` : ''}</span>
+            <button class="btn-eliminar" onclick="eliminarFacturaAsociada(${p.id},'proforma')">🗑️ Eliminar factura</button>
+        </div>`);
+    }
+    if (p.factura_final_numero) {
+        items.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#eafaf1; border-radius:6px; margin-bottom:6px;">
+            <span><strong>Factura Final:</strong> ${p.factura_final_numero}</span>
+            <button class="btn-eliminar" onclick="eliminarFacturaAsociada(${p.id},'final')">🗑️ Eliminar factura</button>
+        </div>`);
+    }
+    if (items.length) {
+        wrap.style.display = 'block';
+        cont.innerHTML = items.join('');
+    } else {
+        wrap.style.display = 'none';
+        cont.innerHTML = '';
+    }
+}
+
+async function eliminarFacturaAsociada(presId, tipo) {
+    if (!confirm(`¿Eliminar la factura ${tipo} asociada? El número quedará libre y la próxima emisión lo reusará.`)) return;
+    const res = await API.delete(`/api/presupuestos/${presId}/factura/${tipo}`);
+    if (res.ok) {
+        alert(`✅ Factura ${res.numero_eliminado} eliminada. Número liberado.`);
+        const lista = await API.get('/api/presupuestos');
+        presupuestosGlobal = lista;
+        const p = presupuestosGlobal.find(x => x.id === presId);
+        if (p) _renderFacturasAsociadas(p);
+        filtrarPresupuestos();
+    } else {
+        alert('Error: ' + (res.error || 'desconocido'));
+    }
+}
+
+async function eliminarPresDesdeModal() {
+    if (!presEditandoId) return;
+    if (!confirm('¿Eliminar este presupuesto? Se borrarán también sus facturas asociadas (los números se liberarán).')) return;
+    const res = await API.delete(`/api/presupuestos/${presEditandoId}`);
+    if (res.ok) {
+        cerrarModal('modalPresupuesto');
+        presupuestosGlobal = presupuestosGlobal.filter(p => p.id !== presEditandoId);
+        filtrarPresupuestos();
+    } else {
+        alert('Error: ' + (res.error || 'desconocido'));
+    }
 }
 
 function addLineaPres(desc = '', importe = '') {
@@ -246,7 +303,7 @@ async function eliminarPresupuesto(id) {
 function verPresupuesto(id) {
     const p = presupuestosGlobal.find(x => x.id === id);
     if (!p) return;
-    if (p.estado === 'BORRADOR' && esAdmin) abrirEditarPresupuesto(id);
+    if (esAdmin) abrirEditarPresupuesto(id);
     else generarPDF(id);
 }
 
