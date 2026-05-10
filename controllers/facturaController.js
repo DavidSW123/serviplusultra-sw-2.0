@@ -1,5 +1,6 @@
-const QRCode = require('qrcode');
-const { db } = require('../config/db');
+const QRCode    = require('qrcode');
+const { db }    = require('../config/db');
+const verifactu = require('../services/verifactu');
 
 // NIF emisor (sin guion, formato AEAT)
 const NIF_EMISOR = (process.env.NIF_EMISOR || 'B26892760').replace(/-/g, '');
@@ -110,11 +111,17 @@ async function emitir(req, res) {
         const numero_factura = await generarNumeroFactura();
         const qr             = await _generarQRVeriFactu(numero_factura, fecha, total);
 
-        await db.execute({
+        const r = await db.execute({
             sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura)
                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
             args: [ot_id, base_imponible, iva, total, qr, fecha, numero_factura]
         });
+
+        // Envío async a AEAT (no bloquea respuesta)
+        const facturaId = Number(r.lastInsertRowid);
+        verifactu.enviarFactura(facturaId)
+            .then(rs => console.log(`📤 AEAT ${numero_factura}: ${rs.estado || (rs.ok?'OK':'ERROR')} ${rs.csv?'CSV='+rs.csv:''} ${rs.error?'ERR='+rs.error:''}`))
+            .catch(e  => console.error(`📤 AEAT ${numero_factura} fallo:`, e.message));
 
         res.json({ mensaje: 'Factura emitida', qr_data: qr, numero_factura, fecha_emision: fecha });
     } catch (e) {
@@ -227,11 +234,17 @@ async function emitirDesdePresupuesto(req, res) {
         const numero_factura = await generarNumeroFactura();
 
         const qr = await _generarQRVeriFactu(numero_factura, fecha, total);
-        await db.execute({
+        const r = await db.execute({
             sql:  `INSERT INTO facturas (presupuesto_id, base_imponible, iva, total, fecha_emision, numero_factura, lineas, qr_data)
                    VALUES (?,?,?,?,?,?,?,?)`,
             args: [presupuesto_id, base_imponible, iva, total, fecha, numero_factura, JSON.stringify(lineas || []), qr]
         });
+
+        // Envío async a AEAT
+        const facturaId = Number(r.lastInsertRowid);
+        verifactu.enviarFactura(facturaId)
+            .then(rs => console.log(`📤 AEAT ${numero_factura}: ${rs.estado || (rs.ok?'OK':'ERROR')} ${rs.csv?'CSV='+rs.csv:''} ${rs.error?'ERR='+rs.error:''}`))
+            .catch(e  => console.error(`📤 AEAT ${numero_factura} fallo:`, e.message));
 
         const campoTotal = tipo === 'proforma' ? ', proforma_total=?' : '';
         const args = tipo === 'proforma'
@@ -298,4 +311,38 @@ async function diagnostico(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico };
+/**
+ * POST /api/facturas/:id/aeat-reenviar
+ * Reenvía a AEAT una factura (útil tras error o ERROR previo).
+ */
+async function reenviarAEAT(req, res) {
+    const { id } = req.params;
+    try {
+        const r = await verifactu.enviarFactura(parseInt(id));
+        res.json(r);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+/**
+ * GET /api/facturas/:id/aeat-estado
+ * Devuelve el estado AEAT de una factura.
+ */
+async function estadoAEAT(req, res) {
+    const { id } = req.params;
+    try {
+        const { rows } = await db.execute({
+            sql:  `SELECT id, numero_factura, aeat_estado, aeat_csv, aeat_huella, aeat_huella_anterior,
+                          aeat_fecha_envio, aeat_error, aeat_intentos, aeat_respuesta
+                   FROM facturas WHERE id=?`,
+            args: [id]
+        });
+        if (!rows[0]) return res.status(404).json({ error: 'No encontrada' });
+        res.json(rows[0]);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, reenviarAEAT, estadoAEAT };

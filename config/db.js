@@ -122,7 +122,17 @@ async function inicializarDB() {
             `ALTER TABLE presupuestos ADD COLUMN factura_final_numero TEXT`,
             `ALTER TABLE presupuestos ADD COLUMN ot_asociada_id INTEGER`,
             `ALTER TABLE presupuestos ADD COLUMN ot_asociada_codigo TEXT`,
-            `ALTER TABLE facturas ADD COLUMN emails_enviados TEXT`
+            `ALTER TABLE facturas ADD COLUMN emails_enviados TEXT`,
+            // VeriFactu / AEAT
+            `ALTER TABLE facturas ADD COLUMN aeat_huella TEXT`,
+            `ALTER TABLE facturas ADD COLUMN aeat_huella_anterior TEXT`,
+            `ALTER TABLE facturas ADD COLUMN aeat_estado TEXT DEFAULT 'PENDIENTE'`,
+            `ALTER TABLE facturas ADD COLUMN aeat_csv TEXT`,
+            `ALTER TABLE facturas ADD COLUMN aeat_fecha_envio TEXT`,
+            `ALTER TABLE facturas ADD COLUMN aeat_error TEXT`,
+            `ALTER TABLE facturas ADD COLUMN aeat_intentos INTEGER DEFAULT 0`,
+            `ALTER TABLE facturas ADD COLUMN aeat_xml_enviado TEXT`,
+            `ALTER TABLE facturas ADD COLUMN aeat_respuesta TEXT`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }

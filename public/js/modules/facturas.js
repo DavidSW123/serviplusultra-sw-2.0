@@ -99,7 +99,60 @@ async function abrirGeneradorFactura(id) {
     renderizarTablaFactura();
     _renderBadgeEnviada(ot.factura_emails_enviados);
     _renderQRVeriFactu(ot.factura_qr);
+    _renderBadgeAEAT(ot.factura_aeat_estado, ot.factura_aeat_error);
+    window._facturaActualId = ot.factura_id || null;
     abrirModal('modalFactura');
+}
+
+function _renderBadgeAEAT(estado, error) {
+    const badge = document.getElementById('badgeAEAT');
+    if (!badge) return;
+    if (!estado) { badge.style.display = 'none'; return; }
+    const colors = {
+        ACEPTADO:  { bg:'#27ae60', txt:'✓ AEAT Aceptada' },
+        PARCIAL:   { bg:'#f39c12', txt:'⚠ AEAT Parcial' },
+        PENDIENTE: { bg:'#95a5a6', txt:'⏳ AEAT Pendiente' },
+        RECHAZADO: { bg:'#e74c3c', txt:'✗ AEAT Rechazada' },
+        ERROR:     { bg:'#c0392b', txt:'⚠ AEAT Error' }
+    };
+    const c = colors[estado] || { bg:'#7f8c8d', txt: 'AEAT ' + estado };
+    badge.style.background = c.bg;
+    badge.style.color = '#fff';
+    badge.innerText = c.txt;
+    badge.title = error || `Estado AEAT: ${estado}`;
+    badge.style.display = 'inline-block';
+}
+
+async function verEstadoAEAT() {
+    const id = window._facturaActualId;
+    if (!id) { alert('No hay factura con ID asociado todavía. Guarda primero los cambios.'); return; }
+    const r = await API.get(`/api/facturas/${id}/aeat-estado`);
+    const cont = document.getElementById('contEstadoAEAT');
+    if (r.error) { cont.innerHTML = `<p style="color:#e74c3c;">${r.error}</p>`; }
+    else {
+        cont.innerHTML = `
+            <p><strong>Nº Factura:</strong> ${r.numero_factura}</p>
+            <p><strong>Estado:</strong> ${r.aeat_estado || '—'}</p>
+            <p><strong>CSV AEAT:</strong> ${r.aeat_csv || '—'}</p>
+            <p><strong>Huella:</strong> <span style="word-break:break-all;">${r.aeat_huella || '—'}</span></p>
+            <p><strong>Huella anterior:</strong> <span style="word-break:break-all;">${r.aeat_huella_anterior || '(primera)'}</span></p>
+            <p><strong>Fecha envío:</strong> ${r.aeat_fecha_envio || '—'}</p>
+            <p><strong>Intentos:</strong> ${r.aeat_intentos || 0}</p>
+            ${r.aeat_error ? `<p style="color:#e74c3c;"><strong>Error:</strong> ${r.aeat_error}</p>` : ''}
+            ${r.aeat_respuesta ? `<details><summary>Respuesta AEAT (raw)</summary><pre style="white-space:pre-wrap; font-size:0.75em; max-height:200px; overflow:auto;">${r.aeat_respuesta.replace(/</g,'&lt;')}</pre></details>` : ''}
+        `;
+    }
+    abrirModal('modalEstadoAEAT');
+}
+
+async function reenviarAEAT() {
+    const id = window._facturaActualId;
+    if (!id) return;
+    const r = await API.post(`/api/facturas/${id}/aeat-reenviar`, {});
+    alert(r.ok ? `✅ AEAT: ${r.estado} ${r.csv ? '(CSV: '+r.csv+')' : ''}` : `❌ ${r.error || r.estado}`);
+    await verEstadoAEAT();
+    // Refrescar lista global
+    try { const frescas = await API.get('/api/ot'); if (Array.isArray(frescas)) otsGlobal = frescas; } catch (_) {}
 }
 
 function _renderQRVeriFactu(qrDataUrl) {
