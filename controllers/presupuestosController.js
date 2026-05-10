@@ -8,6 +8,18 @@ const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
 
 function _ahora() { return new Date().toLocaleString('es-ES'); }
 
+const MSG_FACTURA_PROTEGIDA = 'FACTURA YA ENVIADA A CLIENTE, POR FAVOR, EMITA ABONO DE ESTA FACTURA Y REFACTURAR EN UNA NUEVA.';
+
+/** Una factura está protegida (no se puede borrar) si ha sido enviada al cliente o registrada en AEAT. */
+function _facturaProtegida(f) {
+    if (!f) return false;
+    let envios = [];
+    try { envios = JSON.parse(f.emails_enviados || '[]'); } catch (_) { envios = []; }
+    if (Array.isArray(envios) && envios.length > 0) return true;
+    if (f.aeat_estado === 'ACEPTADO' || f.aeat_estado === 'PARCIAL') return true;
+    return false;
+}
+
 /** Genera referencia PRES{YY}/NNNNN */
 async function _generarReferencia() {
     const yy   = new Date().getFullYear().toString().slice(-2);
@@ -96,6 +108,14 @@ async function eliminar(req, res) {
     try {
         const { rows } = await db.execute({ sql: `SELECT referencia FROM presupuestos WHERE id=?`, args: [id] });
         const ref = rows[0]?.referencia || id;
+        // Comprobar si alguna factura vinculada está protegida (enviada al cliente / registrada en AEAT)
+        const { rows: facts } = await db.execute({
+            sql:  `SELECT emails_enviados, aeat_estado FROM facturas WHERE presupuesto_id=?`,
+            args: [id]
+        });
+        if (facts.some(_facturaProtegida)) {
+            return res.status(403).json({ error: MSG_FACTURA_PROTEGIDA });
+        }
         // Borrar facturas vinculadas (proforma/final) para liberar sus números y que el gap-fill los reasigne
         await db.execute({ sql: `DELETE FROM facturas WHERE presupuesto_id=?`, args: [id] });
         await db.execute({ sql: `DELETE FROM presupuestos WHERE id=?`, args: [id] });
@@ -221,6 +241,15 @@ async function eliminarFacturaAsociada(req, res) {
         });
         const num = rows[0]?.num;
         if (!num) return res.status(404).json({ error: 'No hay factura de ese tipo asociada' });
+
+        // Verifica protección: si esta factura fue enviada al cliente / aceptada por AEAT → no se puede borrar
+        const { rows: facts } = await db.execute({
+            sql:  `SELECT emails_enviados, aeat_estado FROM facturas WHERE numero_factura=? AND presupuesto_id=?`,
+            args: [num, id]
+        });
+        if (facts.some(_facturaProtegida)) {
+            return res.status(403).json({ error: MSG_FACTURA_PROTEGIDA });
+        }
 
         // Borra la factura (libera su número) y limpia los campos del presupuesto
         await db.execute({ sql: `DELETE FROM facturas WHERE numero_factura=? AND presupuesto_id=?`, args: [num, id] });

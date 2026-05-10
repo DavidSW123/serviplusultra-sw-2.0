@@ -216,6 +216,22 @@ async function eliminar(req, res) {
     }
 
     try {
+        // Bloquea borrado si hay factura ya enviada al cliente o aceptada en AEAT
+        const { rows: facts } = await db.execute({
+            sql:  `SELECT emails_enviados, aeat_estado FROM facturas WHERE ot_id = ?`,
+            args: [id]
+        });
+        const protegida = facts.some(f => {
+            let envios = [];
+            try { envios = JSON.parse(f.emails_enviados || '[]'); } catch (_) {}
+            return (Array.isArray(envios) && envios.length > 0)
+                || f.aeat_estado === 'ACEPTADO'
+                || f.aeat_estado === 'PARCIAL';
+        });
+        if (protegida) {
+            return res.status(403).json({ error: 'FACTURA YA ENVIADA A CLIENTE, POR FAVOR, EMITA ABONO DE ESTA FACTURA Y REFACTURAR EN UNA NUEVA.' });
+        }
+
         await db.execute({ sql: `DELETE FROM facturas        WHERE ot_id = ?`, args: [id] });
         await db.execute({ sql: `DELETE FROM ot_adjuntos     WHERE ot_id = ?`, args: [id] });
         await db.execute({ sql: `DELETE FROM ordenes_trabajo WHERE id    = ?`, args: [id] });

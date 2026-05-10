@@ -174,6 +174,7 @@ function _renderFacturasAsociadas(p) {
     const wrap = document.getElementById('presFacturasAsociadas');
     const cont = document.getElementById('presFacturasLista');
     const items = [];
+    // Aviso: no sabemos aquí si la factura ha sido enviada; el backend bloqueará si procede.
     if (p.proforma_numero) {
         items.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#ebf5fb; border-radius:6px; margin-bottom:6px;">
             <span><strong>Proforma:</strong> ${p.proforma_numero} ${p.proforma_total ? `(${fmtP(p.proforma_total)})` : ''}</span>
