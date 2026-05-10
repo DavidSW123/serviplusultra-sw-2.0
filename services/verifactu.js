@@ -248,12 +248,18 @@ async function enviarAEAT(xml) {
         });
         const body = resp.data || '';
         // Extraer CSV y estado del XML respuesta (parseo ligero)
-        const csv     = (body.match(/<.*?CSV.*?>([^<]+)</)         || [])[1] || null;
-        const estado  = (body.match(/<.*?EstadoEnvio.*?>([^<]+)</) || [])[1]
-                     || (body.match(/<.*?EstadoRegistro.*?>([^<]+)</) || [])[1]
-                     || 'ACEPTADO';
-        const errMsg  = (body.match(/<.*?DescripcionErrorRegistro.*?>([^<]+)</) || [])[1] || null;
-        return { ok: !errMsg, csv, estado: errMsg ? 'RECHAZADO' : estado, error: errMsg, respuesta: body };
+        const csv      = (body.match(/<.*?CSV.*?>([^<]+)</)            || [])[1] || null;
+        const estadoR  = (body.match(/<.*?EstadoRegistro.*?>([^<]+)</) || [])[1] || null;
+        const estadoE  = (body.match(/<.*?EstadoEnvio.*?>([^<]+)</)    || [])[1] || null;
+        const errMsg   = (body.match(/<.*?DescripcionErrorRegistro.*?>([^<]+)</) || [])[1] || null;
+        // Normaliza términos AEAT (Correcto/Incorrecto/AceptadoConErrores) → ACEPTADO/RECHAZADO/PARCIAL
+        const raw = estadoR || estadoE || '';
+        let estado = 'ERROR';
+        if (/correcto/i.test(raw) && !/incorrecto/i.test(raw)) estado = 'ACEPTADO';
+        else if (/aceptado.*error/i.test(raw))                  estado = 'PARCIAL';
+        else if (/incorrecto|rechaz/i.test(raw))                estado = 'RECHAZADO';
+        else if (raw)                                           estado = raw.toUpperCase();
+        return { ok: estado === 'ACEPTADO' && !errMsg, csv, estado, error: errMsg, respuesta: body };
     } catch (e) {
         const respuesta = e.response?.data || e.message;
         return { ok: false, csv: null, estado: 'ERROR', error: e.message, respuesta };
