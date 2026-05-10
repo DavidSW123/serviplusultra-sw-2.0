@@ -98,7 +98,20 @@ async function abrirGeneradorFactura(id) {
 
     renderizarTablaFactura();
     _renderBadgeEnviada(ot.factura_emails_enviados);
+    _renderQRVeriFactu(ot.factura_qr);
     abrirModal('modalFactura');
+}
+
+function _renderQRVeriFactu(qrDataUrl) {
+    const bloque = document.getElementById('bloqueQRFact');
+    const img    = document.getElementById('factQRImg');
+    if (!bloque || !img) return;
+    if (qrDataUrl) {
+        img.src = qrDataUrl;
+        bloque.style.display = 'block';
+    } else {
+        bloque.style.display = 'none';
+    }
 }
 
 /** Muestra badge "Enviada X veces" al lado de #factNumero si hay envíos registrados. */
@@ -229,6 +242,7 @@ async function _emitirYRegistrar() {
         document.getElementById('factFechaHoy').innerText = data.fecha_emision
             ? new Date(data.fecha_emision + 'T00:00:00').toLocaleDateString('es-ES')
             : new Date().toLocaleDateString('es-ES');
+        if (data.qr_data) _renderQRVeriFactu(data.qr_data);
     }
     return data;
 }

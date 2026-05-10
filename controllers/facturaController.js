@@ -1,6 +1,34 @@
 const QRCode = require('qrcode');
 const { db } = require('../config/db');
 
+// NIF emisor (sin guion, formato AEAT)
+const NIF_EMISOR = (process.env.NIF_EMISOR || 'B26892760').replace(/-/g, '');
+// VeriFactu: prewww2 = entorno pruebas, www2 = producción
+const VERIFACTU_BASE = process.env.VERIFACTU_BASE
+    || 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR';
+
+/**
+ * Genera la URL VeriFactu del QR según especificación AEAT.
+ * Formato: BASE?nif=...&numserie=...&fecha=DD-MM-YYYY&importe=NN.NN
+ */
+function _urlVeriFactu(numero_factura, fechaISO, importe) {
+    const [yyyy, mm, dd] = (fechaISO || '').split('-');
+    const fechaParam = `${dd}-${mm}-${yyyy}`;
+    const importeFmt = parseFloat(importe || 0).toFixed(2);
+    const params = new URLSearchParams({
+        nif:      NIF_EMISOR,
+        numserie: numero_factura,
+        fecha:    fechaParam,
+        importe:  importeFmt
+    });
+    return `${VERIFACTU_BASE}?${params.toString()}`;
+}
+
+async function _generarQRVeriFactu(numero_factura, fechaISO, total) {
+    const url = _urlVeriFactu(numero_factura, fechaISO, total);
+    return await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 1, width: 220 });
+}
+
 const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
     || 'https://script.google.com/macros/s/AKfycbxwi8cCg4D0mGEK_Xh3V52AHMf31ESpvEbfmXgLNSw-k9GMt9_wauc3GicRqUvT9AkEow/exec';
 
@@ -80,8 +108,7 @@ async function emitir(req, res) {
 
         const fecha          = new Date().toISOString().split('T')[0];
         const numero_factura = await generarNumeroFactura();
-        const textoQR        = `NIF:B-26892760|Factura:${numero_factura}|Fecha:${fecha}|Total:${total}EUR`;
-        const qr             = await QRCode.toDataURL(textoQR);
+        const qr             = await _generarQRVeriFactu(numero_factura, fecha, total);
 
         await db.execute({
             sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura)
@@ -199,10 +226,11 @@ async function emitirDesdePresupuesto(req, res) {
         const fecha          = new Date().toISOString().split('T')[0];
         const numero_factura = await generarNumeroFactura();
 
+        const qr = await _generarQRVeriFactu(numero_factura, fecha, total);
         await db.execute({
-            sql:  `INSERT INTO facturas (presupuesto_id, base_imponible, iva, total, fecha_emision, numero_factura, lineas)
-                   VALUES (?,?,?,?,?,?,?)`,
-            args: [presupuesto_id, base_imponible, iva, total, fecha, numero_factura, JSON.stringify(lineas || [])]
+            sql:  `INSERT INTO facturas (presupuesto_id, base_imponible, iva, total, fecha_emision, numero_factura, lineas, qr_data)
+                   VALUES (?,?,?,?,?,?,?,?)`,
+            args: [presupuesto_id, base_imponible, iva, total, fecha, numero_factura, JSON.stringify(lineas || []), qr]
         });
 
         const campoTotal = tipo === 'proforma' ? ', proforma_total=?' : '';
@@ -215,7 +243,7 @@ async function emitirDesdePresupuesto(req, res) {
             args
         });
 
-        res.json({ ok: true, numero_factura, fecha_emision: fecha });
+        res.json({ ok: true, numero_factura, fecha_emision: fecha, qr_data: qr });
     } catch (e) {
         res.status(500).json({ error: 'Error al emitir desde presupuesto: ' + e.message });
     }

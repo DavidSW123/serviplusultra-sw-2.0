@@ -400,10 +400,10 @@ async function confirmarEmitirFacturaPres() {
     filtrarPresupuestos();
 
     const pActualizado = presupuestosGlobal.find(x => x.id === id);
-    if (pActualizado) await _generarFacturaPDF(pActualizado, tipo, res.numero_factura, res.fecha_emision, base, iva, total, lineas);
+    if (pActualizado) await _generarFacturaPDF(pActualizado, tipo, res.numero_factura, res.fecha_emision, base, iva, total, lineas, res.qr_data);
 }
 
-async function _generarFacturaPDF(p, tipo, numero_factura, fecha_emision, base, iva, total, lineas) {
+async function _generarFacturaPDF(p, tipo, numero_factura, fecha_emision, base, iva, total, lineas, qr_data) {
     const esProforma = tipo === 'proforma';
     const el = document.getElementById('pdfFacturaPres');
 
@@ -426,6 +426,16 @@ async function _generarFacturaPDF(p, tipo, numero_factura, fecha_emision, base, 
     document.getElementById('pdfFactPresIva').innerText     = fmtP(iva);
     document.getElementById('pdfFactPresTotal').innerText   = fmtP(total);
     document.getElementById('pdfFactPresNotaProforma').style.display = esProforma ? 'block' : 'none';
+
+    // QR VeriFactu
+    const qrBloque = document.getElementById('pdfFactPresQRBloque');
+    const qrImg    = document.getElementById('pdfFactPresQR');
+    if (qr_data && qrBloque && qrImg) {
+        qrImg.src = qr_data;
+        qrBloque.style.display = 'block';
+    } else if (qrBloque) {
+        qrBloque.style.display = 'none';
+    }
 
     document.getElementById('pdfFactPresLineas').innerHTML = (lineas || []).map((l, i) =>
         `<tr style="background:${i%2===0?'#fff':'#f8f9fa'}">
