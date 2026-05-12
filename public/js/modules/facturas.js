@@ -113,8 +113,9 @@ async function abrirGeneradorFactura(id) {
             btnRect.style.display = 'none';
             const fNum = document.getElementById('factNumero');
             if (fNum) {
+                const rectId = ot.factura_rectificada_por_id;
                 fNum.insertAdjacentHTML('afterend',
-                    ` <span id="tagRectificada" class="no-print" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px;" title="Esta factura ha sido rectificada">📝 Rectificada por ${ot.factura_rectificativa_numero || ''}</span>`);
+                    ` <span id="tagRectificada" class="no-print" onclick="verRectificativa(${rectId})" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px; cursor:pointer;" title="Click para ver la rectificativa">📝 Rectificada por ${ot.factura_rectificativa_numero || ''} →</span>`);
             }
         } else {
             btnRect.style.display = '';
@@ -126,7 +127,8 @@ async function abrirGeneradorFactura(id) {
 function _renderBadgeAEAT(estado, error) {
     const badge = document.getElementById('badgeAEAT');
     if (!badge) return;
-    if (!estado) { badge.style.display = 'none'; return; }
+    // Si está desactivado (VeriFactu off hasta 2027), no mostramos badge
+    if (!estado || estado === 'DESACTIVADO' || estado === 'PENDIENTE') { badge.style.display = 'none'; return; }
     const colors = {
         ACEPTADO:  { bg:'#27ae60', txt:'✓ AEAT Aceptada' },
         PARCIAL:   { bg:'#f39c12', txt:'⚠ AEAT Parcial' },
@@ -209,6 +211,68 @@ function _renderLineasRect() {
 function rectActualizarLinea(i, c, v) { lineasRect[i][c] = c === 'concepto' ? v : (parseFloat(v) || 0); _renderLineasRect(); }
 function rectAgregarLinea()           { lineasRect.push({ concepto: '', cantidad: 1, precio: 0 }); _renderLineasRect(); }
 function rectBorrarLinea(i)           { lineasRect.splice(i, 1); _renderLineasRect(); }
+
+/** Listado global de facturas rectificativas. */
+async function verListaRectificativas() {
+    const lista = await API.get('/api/facturas/rectificativas');
+    const tbody = document.getElementById('tbodyRectList');
+    if (!Array.isArray(lista) || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#888; padding:20px;">No hay facturas rectificativas emitidas todavía.</td></tr>';
+    } else {
+        tbody.innerHTML = lista.map(r => `
+            <tr>
+                <td><strong style="color:#e67e22;">${r.numero_factura}</strong></td>
+                <td>${r.fecha_emision || '—'}</td>
+                <td>${r.orig_numero || '—'}</td>
+                <td>${r.cliente_nombre || '—'}</td>
+                <td>${r.codigo_ot || r.presupuesto_ref || '—'}</td>
+                <td style="text-align:right;"><strong>${parseFloat(r.total||0).toFixed(2)} €</strong></td>
+                <td style="font-size:0.85em; color:#7f8c8d;">${(r.motivo_rectificacion||'').substring(0,60)}${(r.motivo_rectificacion||'').length>60?'...':''}</td>
+                <td><button class="btn-secundario" style="padding:5px 10px; font-size:0.85em;" onclick="verRectificativa(${r.id})">Ver</button></td>
+            </tr>
+        `).join('');
+    }
+    abrirModal('modalListaRect');
+}
+
+/** Muestra una factura rectificativa en modal de solo lectura. */
+async function verRectificativa(facturaId) {
+    if (!facturaId) return;
+    const f = await API.get(`/api/facturas/${facturaId}`);
+    if (f.error) { alert('❌ ' + f.error); return; }
+
+    let lineas = [];
+    try { lineas = JSON.parse(f.lineas || '[]'); } catch (_) { lineas = []; }
+
+    const filas = lineas.map(l => `
+        <tr>
+            <td>${l.concepto || ''}</td>
+            <td style="text-align:center;">${l.cantidad}</td>
+            <td style="text-align:right;">${parseFloat(l.precio||0).toFixed(2)} €</td>
+            <td style="text-align:right;">${(parseFloat(l.cantidad||0)*parseFloat(l.precio||0)).toFixed(2)} €</td>
+        </tr>`).join('');
+
+    const html = `
+        <div style="background:#fff3e0; border-left:4px solid #e67e22; padding:10px 14px; border-radius:0 6px 6px 0; margin-bottom:14px;">
+            <strong>Rectifica a:</strong> ${f.rectifica_a_numero || '—'}<br>
+            <strong>Motivo:</strong> ${f.motivo_rectificacion || '—'}
+        </div>
+        <p><strong>Nº Factura:</strong> ${f.numero_factura}</p>
+        <p><strong>Fecha:</strong> ${f.fecha_emision || '—'}</p>
+        <p><strong>OT/Presupuesto:</strong> ${f.codigo_ot || f.presupuesto_ref || '—'}</p>
+        <table class="tabla-holded" style="margin-top:10px;"><thead><tr><th>Concepto</th><th>Cant.</th><th>Precio/U</th><th style="text-align:right;">Total</th></tr></thead><tbody>${filas}</tbody></table>
+        <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+            <div class="totales-caja">
+                <p>Base: <strong>${parseFloat(f.base_imponible||0).toFixed(2)} €</strong></p>
+                <p>IVA: <strong>${parseFloat(f.iva||0).toFixed(2)} €</strong></p>
+                <h3>Total: ${parseFloat(f.total||0).toFixed(2)} €</h3>
+            </div>
+        </div>
+        ${f.qr_data ? `<div style="text-align:center; margin-top:14px;"><img src="${f.qr_data}" style="width:130px;"><div style="font-weight:700; letter-spacing:2px; color:#2c3e50;">VERI*FACTU</div></div>` : ''}
+    `;
+    document.getElementById('contVerRect').innerHTML = html;
+    abrirModal('modalVerRect');
+}
 
 async function confirmarRectificar() {
     const motivo = document.getElementById('rectMotivo').value.trim();

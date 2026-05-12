@@ -274,6 +274,11 @@ async function enviarAEAT(xml) {
  * No lanza errores: registra el fallo para reintento posterior.
  */
 async function enviarFactura(facturaId) {
+    // Feature flag: VeriFactu no es obligatorio hasta 2027.
+    // Para activar pon VERIFACTU_ENABLED=true en variables de entorno.
+    if (process.env.VERIFACTU_ENABLED !== 'true') {
+        return { ok: false, estado: 'DESACTIVADO', error: null };
+    }
     try {
         const { rows } = await db.execute({
             sql: `SELECT f.*, c.nombre AS cliente_nombre, c.nif AS cliente_nif

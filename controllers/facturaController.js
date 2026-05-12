@@ -453,4 +453,57 @@ async function rectificar(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, reenviarAEAT, estadoAEAT, rectificar };
+/**
+ * GET /api/facturas/:id
+ * Devuelve los datos completos de una factura (incluida lineas, qr, etc.)
+ * Útil para mostrar rectificativas o consultar facturas concretas.
+ */
+async function getFactura(req, res) {
+    const { id } = req.params;
+    try {
+        const { rows } = await db.execute({
+            sql: `SELECT f.*,
+                         ot.codigo_ot,
+                         p.referencia AS presupuesto_ref,
+                         orig.numero_factura AS rectifica_a_numero
+                  FROM facturas f
+                  LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
+                  LEFT JOIN presupuestos    p  ON p.id  = f.presupuesto_id
+                  LEFT JOIN facturas        orig ON orig.id = f.factura_rectificada_id
+                  WHERE f.id = ?`,
+            args: [id]
+        });
+        if (!rows[0]) return res.status(404).json({ error: 'Factura no encontrada' });
+        res.json(rows[0]);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+/**
+ * GET /api/facturas/rectificativas
+ * Lista todas las facturas rectificativas con su factura original.
+ */
+async function listarRectificativas(req, res) {
+    try {
+        const { rows } = await db.execute(`
+            SELECT f.id, f.numero_factura, f.fecha_emision, f.base_imponible, f.iva, f.total,
+                   f.motivo_rectificacion, f.lineas,
+                   orig.id AS orig_id, orig.numero_factura AS orig_numero,
+                   ot.codigo_ot, p.referencia AS presupuesto_ref,
+                   c.nombre AS cliente_nombre
+            FROM facturas f
+            LEFT JOIN facturas        orig ON orig.id = f.factura_rectificada_id
+            LEFT JOIN ordenes_trabajo ot   ON ot.id   = f.ot_id
+            LEFT JOIN presupuestos    p    ON p.id    = f.presupuesto_id
+            LEFT JOIN clientes        c    ON c.id    = COALESCE(ot.cliente_id, p.cliente_id)
+            WHERE f.es_rectificativa = 1
+            ORDER BY f.id DESC
+        `);
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, reenviarAEAT, estadoAEAT, rectificar, getFactura, listarRectificativas };

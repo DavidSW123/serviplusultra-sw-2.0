@@ -58,6 +58,8 @@ router.get   ('/facturas/diagnostico',       soloAdmin,   facturaController.diag
 router.post  ('/facturas/:id/aeat-reenviar', soloAdmin,   facturaController.reenviarAEAT);
 router.get   ('/facturas/:id/aeat-estado',   autenticado, facturaController.estadoAEAT);
 router.post  ('/facturas/:id/rectificar',    soloAdmin,   facturaController.rectificar);
+router.get   ('/facturas/rectificativas',    autenticado, facturaController.listarRectificativas);
+router.get   ('/facturas/:id',               autenticado, facturaController.getFactura);
 router.post  ('/enviar-factura',             autenticado, facturaController.enviarEmail);
 router.post  ('/test-email',                 autenticado, facturaController.testEmail);
 
