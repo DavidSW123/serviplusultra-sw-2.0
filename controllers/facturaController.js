@@ -180,7 +180,7 @@ async function emitir(req, res) {
  * Body: { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo }
  */
 async function enviarEmail(req, res) {
-    const { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo, ot_id } = req.body;
+    const { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo, ot_id, factura_id } = req.body;
     try {
         await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
@@ -193,20 +193,22 @@ async function enviarEmail(req, res) {
             })
         });
 
-        // Registrar envío en facturas.emails_enviados si hay ot_id
-        if (ot_id) {
+        // Registrar envío en facturas.emails_enviados (preferimos factura_id si viene)
+        if (factura_id || ot_id) {
             try {
+                const whereClause = factura_id ? 'id = ?' : 'ot_id = ? AND COALESCE(es_rectificativa,0)=0';
+                const arg         = factura_id || ot_id;
                 const { rows } = await db.execute({
-                    sql:  `SELECT emails_enviados FROM facturas WHERE ot_id = ?`,
-                    args: [ot_id]
+                    sql:  `SELECT id, emails_enviados FROM facturas WHERE ${whereClause}`,
+                    args: [arg]
                 });
                 if (rows[0]) {
                     let arr = [];
                     try { arr = JSON.parse(rows[0].emails_enviados || '[]'); } catch { arr = []; }
                     arr.push({ email: emailDestino, fecha: new Date().toLocaleString('es-ES') });
                     await db.execute({
-                        sql:  `UPDATE facturas SET emails_enviados=? WHERE ot_id=?`,
-                        args: [JSON.stringify(arr), ot_id]
+                        sql:  `UPDATE facturas SET emails_enviados=? WHERE id=?`,
+                        args: [JSON.stringify(arr), rows[0].id]
                     });
                 }
             } catch (_) { /* no bloquear respuesta si falla el tracking */ }
@@ -244,12 +246,20 @@ async function testEmail(req, res) {
  * Guarda las líneas modificadas en la factura existente.
  */
 async function actualizarLineas(req, res) {
-    const { ot_id, lineas } = req.body;
+    const { ot_id, factura_id, lineas } = req.body;
     try {
-        await db.execute({
-            sql:  `UPDATE facturas SET lineas=? WHERE ot_id=?`,
-            args: [JSON.stringify(lineas || []), ot_id]
-        });
+        if (factura_id) {
+            await db.execute({
+                sql:  `UPDATE facturas SET lineas=? WHERE id=?`,
+                args: [JSON.stringify(lineas || []), factura_id]
+            });
+        } else {
+            // Actualiza la regular (no rectificativa) por ot_id
+            await db.execute({
+                sql:  `UPDATE facturas SET lineas=? WHERE ot_id=? AND COALESCE(es_rectificativa,0)=0`,
+                args: [JSON.stringify(lineas || []), ot_id]
+            });
+        }
         res.json({ ok: true });
     } catch (e) {
         res.status(500).json({ error: 'Error al guardar líneas: ' + e.message });

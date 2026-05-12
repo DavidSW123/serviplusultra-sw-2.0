@@ -71,6 +71,8 @@ async function abrirGeneradorFactura(id) {
     const ot = otsGlobal.find(o => o.id === id);
     otActualId     = ot.id;
     otActualCodigo = ot.codigo_ot;
+    window._modoRectificativa = false;
+    document.getElementById('factNumero').style.color  = ot.numero_factura ? '#1abc9c' : '#aaa';
 
     document.getElementById('factOtCode').innerText    = ot.codigo_ot;
     document.getElementById('factNumero').innerText    = ot.numero_factura || '(se asignará al emitir)';
@@ -235,43 +237,56 @@ async function verListaRectificativas() {
     abrirModal('modalListaRect');
 }
 
-/** Muestra una factura rectificativa en modal de solo lectura. */
+/** Abre una rectificativa en el modal completo de factura (editable, PDF, email). */
 async function verRectificativa(facturaId) {
     if (!facturaId) return;
+    // Cerrar el listado si está abierto (mejor UX)
+    cerrarModal('modalListaRect');
+
     const f = await API.get(`/api/facturas/${facturaId}`);
     if (f.error) { alert('❌ ' + f.error); return; }
 
-    let lineas = [];
-    try { lineas = JSON.parse(f.lineas || '[]'); } catch (_) { lineas = []; }
+    // Modo rectificativa: marcamos flag y cargamos en el modal estándar
+    window._modoRectificativa = true;
+    window._facturaActualId   = f.id;
+    otActualId     = f.ot_id || null;
+    otActualCodigo = f.codigo_ot || f.presupuesto_ref || '—';
 
-    const filas = lineas.map(l => `
-        <tr>
-            <td>${l.concepto || ''}</td>
-            <td style="text-align:center;">${l.cantidad}</td>
-            <td style="text-align:right;">${parseFloat(l.precio||0).toFixed(2)} €</td>
-            <td style="text-align:right;">${(parseFloat(l.cantidad||0)*parseFloat(l.precio||0)).toFixed(2)} €</td>
-        </tr>`).join('');
+    // Cargar líneas
+    try { lineasFactura = JSON.parse(f.lineas || '[]'); } catch (_) { lineasFactura = []; }
 
-    const html = `
-        <div style="background:#fff3e0; border-left:4px solid #e67e22; padding:10px 14px; border-radius:0 6px 6px 0; margin-bottom:14px;">
-            <strong>Rectifica a:</strong> ${f.rectifica_a_numero || '—'}<br>
-            <strong>Motivo:</strong> ${f.motivo_rectificacion || '—'}
-        </div>
-        <p><strong>Nº Factura:</strong> ${f.numero_factura}</p>
-        <p><strong>Fecha:</strong> ${f.fecha_emision || '—'}</p>
-        <p><strong>OT/Presupuesto:</strong> ${f.codigo_ot || f.presupuesto_ref || '—'}</p>
-        <table class="tabla-holded" style="margin-top:10px;"><thead><tr><th>Concepto</th><th>Cant.</th><th>Precio/U</th><th style="text-align:right;">Total</th></tr></thead><tbody>${filas}</tbody></table>
-        <div style="display:flex; justify-content:flex-end; margin-top:14px;">
-            <div class="totales-caja">
-                <p>Base: <strong>${parseFloat(f.base_imponible||0).toFixed(2)} €</strong></p>
-                <p>IVA: <strong>${parseFloat(f.iva||0).toFixed(2)} €</strong></p>
-                <h3>Total: ${parseFloat(f.total||0).toFixed(2)} €</h3>
-            </div>
-        </div>
-        ${f.qr_data ? `<div style="text-align:center; margin-top:14px;"><img src="${f.qr_data}" style="width:130px;"><div style="font-weight:700; letter-spacing:2px; color:#2c3e50;">VERI*FACTU</div></div>` : ''}
-    `;
-    document.getElementById('contVerRect').innerHTML = html;
-    abrirModal('modalVerRect');
+    // Populate UI
+    document.getElementById('factOtCode').innerText    = `${otActualCodigo} (rectifica ${f.rectifica_a_numero || ''})`;
+    document.getElementById('factNumero').innerText    = f.numero_factura;
+    document.getElementById('factNumero').style.color  = '#e67e22';
+    document.getElementById('factFechaHoy').innerText  = f.fecha_emision
+        ? new Date(f.fecha_emision + 'T00:00:00').toLocaleDateString('es-ES')
+        : new Date().toLocaleDateString('es-ES');
+
+    // Cliente: usar el de la OT/presupuesto si está disponible
+    const clienteId = (otsGlobal.find(o => o.id === f.ot_id) || {}).cliente_id || '';
+    document.getElementById('selClienteFactura').value = clienteId || '';
+    actualizarInfoClienteFactura();
+
+    renderizarTablaFactura();
+    _renderBadgeEnviada(f.emails_enviados);
+    _renderQRVeriFactu(f.qr_data);
+    _renderBadgeAEAT(f.aeat_estado, f.aeat_error);
+
+    // Limpiar tag previa y añadir aviso de "es rectificativa de XX"
+    const prevTag = document.getElementById('tagRectificada');
+    if (prevTag) prevTag.remove();
+    const fNum = document.getElementById('factNumero');
+    if (fNum) {
+        fNum.insertAdjacentHTML('afterend',
+            ` <span id="tagRectificada" class="no-print" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px;" title="${(f.motivo_rectificacion || '').replace(/"/g,'&quot;')}">📝 Rectificativa de ${f.rectifica_a_numero || ''}</span>`);
+    }
+
+    // Ocultar botón "Emitir Rectificativa" (no se puede rectificar una rectificativa)
+    const btnRect = document.getElementById('btnRectificarFact');
+    if (btnRect) btnRect.style.display = 'none';
+
+    abrirModal('modalFactura');
 }
 
 async function confirmarRectificar() {
@@ -451,11 +466,15 @@ async function _emitirYRegistrar() {
 /** Guarda las líneas modificadas en la factura (crea la factura si no existe todavía). */
 async function guardarCambiosFactura() {
     try {
-        await _emitirYRegistrar();
-        await API.post('/api/factura/lineas', { ot_id: otActualId, lineas: lineasFactura });
-        // Refrescar otsGlobal para que la próxima apertura cargue las líneas guardadas
-        const frescas = await API.get('/api/ot');
-        if (Array.isArray(frescas)) otsGlobal = frescas;
+        if (window._modoRectificativa) {
+            // Rectificativa: ya está emitida, solo actualizamos líneas
+            await API.post('/api/factura/lineas', { factura_id: window._facturaActualId, lineas: lineasFactura });
+        } else {
+            await _emitirYRegistrar();
+            await API.post('/api/factura/lineas', { ot_id: otActualId, lineas: lineasFactura });
+            const frescas = await API.get('/api/ot');
+            if (Array.isArray(frescas)) otsGlobal = frescas;
+        }
         const numFact = document.getElementById('factNumero').innerText;
         alert(`✅ Cambios guardados (${numFact})`);
     } catch (e) {
@@ -465,7 +484,9 @@ async function guardarCambiosFactura() {
 
 /** Descarga el PDF de la factura sin cabeceras del navegador. */
 async function descargarFacturaPDF() {
-    try { await _emitirYRegistrar(); } catch (e) { alert('❌ ' + e.message); return; }
+    if (!window._modoRectificativa) {
+        try { await _emitirYRegistrar(); } catch (e) { alert('❌ ' + e.message); return; }
+    }
 
     const numFactura = document.getElementById('factNumero').innerText;
     const area       = document.getElementById('facturaAreaImpresion');
@@ -496,7 +517,9 @@ async function enviarFacturaAlCliente() {
     if (!confirm(`¿Enviar PDF a ${cliente.email}?`)) return;
 
     alert('⏳ Generando PDF y enviando...');
-    try { await _emitirYRegistrar(); } catch (e) { alert('❌ ' + e.message); return; }
+    if (!window._modoRectificativa) {
+        try { await _emitirYRegistrar(); } catch (e) { alert('❌ ' + e.message); return; }
+    }
 
     const numFactura = document.getElementById('factNumero').innerText;
     const area       = document.getElementById('facturaAreaImpresion');
@@ -518,7 +541,8 @@ async function enviarFacturaAlCliente() {
         document.getElementById('printClienteNombre').style.display = 'none';
 
         API.post('/api/enviar-factura', {
-            ot_id:         otActualId,
+            ot_id:         window._modoRectificativa ? null : otActualId,
+            factura_id:    window._facturaActualId,
             emailDestino:  cliente.email,
             asunto:        `Factura ${numFactura} - ServiPlusUltra`,
             htmlBody:      `<div style="font-family:Arial;padding:20px;"><h2>Hola, ${cliente.nombre}</h2><p>Adjuntamos la factura <strong>${numFactura}</strong> de la OT <strong>${otActualCodigo}</strong>.</p></div>`,
@@ -527,13 +551,18 @@ async function enviarFacturaAlCliente() {
         }).then(async data => {
             if (data.error) { alert('❌ ' + data.error); return; }
             alert('✅ ' + data.mensaje);
-            // Refrescar otsGlobal para que aparezca el badge al reabrir
+            // Refrescar badge: si rectificativa, recargar desde /api/facturas/:id; si no, otsGlobal
             try {
-                const frescas = await API.get('/api/ot');
-                if (Array.isArray(frescas)) {
-                    otsGlobal = frescas;
-                    const otFresh = otsGlobal.find(o => o.id === otActualId);
-                    if (otFresh) _renderBadgeEnviada(otFresh.factura_emails_enviados);
+                if (window._modoRectificativa) {
+                    const fresh = await API.get(`/api/facturas/${window._facturaActualId}`);
+                    if (fresh && !fresh.error) _renderBadgeEnviada(fresh.emails_enviados);
+                } else {
+                    const frescas = await API.get('/api/ot');
+                    if (Array.isArray(frescas)) {
+                        otsGlobal = frescas;
+                        const otFresh = otsGlobal.find(o => o.id === otActualId);
+                        if (otFresh) _renderBadgeEnviada(otFresh.factura_emails_enviados);
+                    }
                 }
             } catch (_) {}
         });
