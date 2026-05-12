@@ -45,6 +45,52 @@ const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
  * recibirá la 14 (en lugar de saltar a 15+) para que NUNCA queden
  * números huérfanos en la secuencia anual.
  */
+/**
+ * Genera el siguiente número de factura RECTIFICATIVA del año.
+ * Serie separada con prefijo R-, gap-fill propio.
+ * Formato: R-NN-YYYYMMDD
+ */
+async function generarNumeroRectificativa() {
+    const hoy  = new Date();
+    const year = hoy.getFullYear();
+    const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd   = String(hoy.getDate()).padStart(2, '0');
+
+    // Limpieza inline: huérfanas
+    try {
+        await db.execute(`
+            DELETE FROM facturas
+            WHERE id IN (
+                SELECT f.id FROM facturas f
+                LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
+                LEFT JOIN presupuestos    p  ON p.id  = f.presupuesto_id
+                WHERE (f.ot_id IS NULL OR ot.id IS NULL)
+                  AND (f.presupuesto_id IS NULL OR p.id IS NULL)
+                  AND (f.factura_rectificada_id IS NULL)
+            )
+        `);
+    } catch (_) {}
+
+    // Recupera todos los numero_factura que empiezan por R- del año
+    const { rows } = await db.execute({
+        sql:  `SELECT numero_factura FROM facturas
+               WHERE numero_factura LIKE 'R-%' AND numero_factura LIKE ?
+               ORDER BY numero_factura ASC`,
+        args: [`R-%-${year}%`]
+    });
+
+    const usados = new Set();
+    for (const r of rows) {
+        // Formato R-NN-YYYYMMDD → extraer NN
+        const m = (r.numero_factura || '').match(/^R-(\d+)-/);
+        if (m) usados.add(parseInt(m[1]));
+    }
+    let seq = 1;
+    while (usados.has(seq)) seq++;
+    const seqStr = seq < 100 ? String(seq).padStart(2, '0') : String(seq);
+    return `R-${seqStr}-${year}${mm}${dd}`;
+}
+
 async function generarNumeroFactura() {
     const hoy  = new Date();
     const year = hoy.getFullYear();
@@ -345,4 +391,66 @@ async function estadoAEAT(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, reenviarAEAT, estadoAEAT };
+/**
+ * POST /api/facturas/:id/rectificar
+ * Body: { lineas, base_imponible, iva, total, motivo }
+ * Crea una factura rectificativa vinculada a la original y la marca como "rectificada_por".
+ */
+async function rectificar(req, res) {
+    const { id } = req.params;
+    const { lineas, base_imponible, iva, total, motivo } = req.body;
+    try {
+        const { rows } = await db.execute({ sql: `SELECT * FROM facturas WHERE id=?`, args: [id] });
+        if (!rows[0]) return res.status(404).json({ error: 'Factura original no encontrada' });
+        const orig = rows[0];
+
+        if (orig.es_rectificativa) {
+            return res.status(400).json({ error: 'No se puede rectificar una factura rectificativa. Rectifica la original.' });
+        }
+        if (orig.rectificada_por_id) {
+            return res.status(400).json({ error: `Esta factura ya tiene una rectificativa asociada (ID ${orig.rectificada_por_id}).` });
+        }
+
+        const fecha   = new Date().toISOString().split('T')[0];
+        const numeroR = await generarNumeroRectificativa();
+        const qr      = await _generarQRVeriFactu(numeroR, fecha, total);
+
+        const r = await db.execute({
+            sql:  `INSERT INTO facturas
+                   (ot_id, presupuesto_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura, lineas,
+                    es_rectificativa, factura_rectificada_id, motivo_rectificacion)
+                   VALUES (?,?,?,?,?,?,?,?,?,1,?,?)`,
+            args: [
+                orig.ot_id, orig.presupuesto_id,
+                base_imponible, iva, total, qr, fecha, numeroR,
+                JSON.stringify(lineas || []),
+                orig.id, motivo || ''
+            ]
+        });
+
+        const newId = Number(r.lastInsertRowid);
+        await db.execute({
+            sql:  `UPDATE facturas SET rectificada_por_id=? WHERE id=?`,
+            args: [newId, orig.id]
+        });
+
+        // Envío AEAT async (no bloquea)
+        verifactu.enviarFactura(newId)
+            .then(rs => console.log(`📤 AEAT ${numeroR}: ${rs.estado || (rs.ok?'OK':'ERROR')} ${rs.csv?'CSV='+rs.csv:''}`))
+            .catch(e  => console.error(`📤 AEAT ${numeroR} fallo:`, e.message));
+
+        res.json({
+            ok: true,
+            id: newId,
+            numero_factura: numeroR,
+            fecha_emision: fecha,
+            qr_data: qr,
+            factura_rectificada_id: orig.id,
+            numero_rectificada: orig.numero_factura
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, reenviarAEAT, estadoAEAT, rectificar };

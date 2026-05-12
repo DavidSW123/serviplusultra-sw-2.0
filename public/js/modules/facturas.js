@@ -101,6 +101,25 @@ async function abrirGeneradorFactura(id) {
     _renderQRVeriFactu(ot.factura_qr);
     _renderBadgeAEAT(ot.factura_aeat_estado, ot.factura_aeat_error);
     window._facturaActualId = ot.factura_id || null;
+
+    // Limpiar etiqueta "Rectificada por..." previa si la hubiera
+    const prevTag = document.getElementById('tagRectificada');
+    if (prevTag) prevTag.remove();
+
+    // Botón rectificar: ocultar si ya rectificada
+    const btnRect = document.getElementById('btnRectificarFact');
+    if (btnRect) {
+        if (ot.factura_rectificada_por_id) {
+            btnRect.style.display = 'none';
+            const fNum = document.getElementById('factNumero');
+            if (fNum) {
+                fNum.insertAdjacentHTML('afterend',
+                    ` <span id="tagRectificada" class="no-print" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px;" title="Esta factura ha sido rectificada">📝 Rectificada por ${ot.factura_rectificativa_numero || ''}</span>`);
+            }
+        } else {
+            btnRect.style.display = '';
+        }
+    }
     abrirModal('modalFactura');
 }
 
@@ -143,6 +162,71 @@ async function verEstadoAEAT() {
         `;
     }
     abrirModal('modalEstadoAEAT');
+}
+
+// ── Rectificativa ──────────────────────────────────────────────
+
+let lineasRect = [];
+
+function abrirRectificar() {
+    const numActual = document.getElementById('factNumero').innerText;
+    if (!window._facturaActualId || numActual.includes('asignará')) {
+        alert('❌ Guarda primero la factura antes de rectificarla.');
+        return;
+    }
+    if (numActual.startsWith('R-')) {
+        alert('❌ No se puede rectificar una factura rectificativa.');
+        return;
+    }
+    document.getElementById('rectOrigNumero').innerText = numActual;
+    document.getElementById('rectMotivo').value = '';
+    // Pre-cargar líneas de la factura original (copia editable)
+    lineasRect = lineasFactura.map(l => ({ concepto: l.concepto, cantidad: l.cantidad, precio: l.precio }));
+    _renderLineasRect();
+    abrirModal('modalRectificar');
+}
+
+function _renderLineasRect() {
+    const tbody = document.getElementById('tbodyRectLineas');
+    tbody.innerHTML = '';
+    let base = 0;
+    lineasRect.forEach((l, idx) => {
+        const t = (parseFloat(l.cantidad)||0) * (parseFloat(l.precio)||0);
+        base += t;
+        tbody.innerHTML += `<tr>
+            <td><input type="text"   value="${(l.concepto||'').replace(/"/g,'&quot;')}" onchange="rectActualizarLinea(${idx},'concepto',this.value)"></td>
+            <td><input type="number" step="0.1"  value="${l.cantidad}" onchange="rectActualizarLinea(${idx},'cantidad',this.value)"></td>
+            <td><input type="number" step="0.01" value="${l.precio}"   onchange="rectActualizarLinea(${idx},'precio',this.value)"></td>
+            <td style="text-align:right;">${t.toFixed(2)} €</td>
+            <td><button class="btn-peligro" onclick="rectBorrarLinea(${idx})">🗑️</button></td>
+        </tr>`;
+    });
+    const iva = base * 0.21;
+    document.getElementById('rectBase').innerText  = base.toFixed(2);
+    document.getElementById('rectIva').innerText   = iva.toFixed(2);
+    document.getElementById('rectTotal').innerText = (base + iva).toFixed(2);
+}
+function rectActualizarLinea(i, c, v) { lineasRect[i][c] = c === 'concepto' ? v : (parseFloat(v) || 0); _renderLineasRect(); }
+function rectAgregarLinea()           { lineasRect.push({ concepto: '', cantidad: 1, precio: 0 }); _renderLineasRect(); }
+function rectBorrarLinea(i)           { lineasRect.splice(i, 1); _renderLineasRect(); }
+
+async function confirmarRectificar() {
+    const motivo = document.getElementById('rectMotivo').value.trim();
+    if (!motivo) { alert('❌ Indica el motivo de la rectificación.'); return; }
+    const base  = parseFloat(document.getElementById('rectBase').innerText);
+    const iva   = parseFloat(document.getElementById('rectIva').innerText);
+    const total = parseFloat(document.getElementById('rectTotal').innerText);
+
+    if (!confirm(`¿Emitir rectificativa por ${total.toFixed(2)} €?\n\nMotivo: ${motivo}\n\nSe creará una nueva factura R-NN-YYYYMMDD y la original quedará marcada como rectificada.`)) return;
+
+    const r = await API.post(`/api/facturas/${window._facturaActualId}/rectificar`, {
+        lineas: lineasRect, base_imponible: base, iva, total, motivo
+    });
+    if (r.error) { alert('❌ ' + r.error); return; }
+    cerrarModal('modalRectificar');
+    alert(`✅ Rectificativa emitida: ${r.numero_factura}\n\nLa factura original (${r.numero_rectificada}) ha quedado vinculada.`);
+    try { const frescas = await API.get('/api/ot'); if (Array.isArray(frescas)) otsGlobal = frescas; } catch (_) {}
+    cerrarModal('modalFactura');
 }
 
 async function reenviarAEAT() {

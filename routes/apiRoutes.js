@@ -57,6 +57,7 @@ router.post  ('/facturas/purgar-huerfanas',  soloAdmin,   facturaController.purg
 router.get   ('/facturas/diagnostico',       soloAdmin,   facturaController.diagnostico);
 router.post  ('/facturas/:id/aeat-reenviar', soloAdmin,   facturaController.reenviarAEAT);
 router.get   ('/facturas/:id/aeat-estado',   autenticado, facturaController.estadoAEAT);
+router.post  ('/facturas/:id/rectificar',    soloAdmin,   facturaController.rectificar);
 router.post  ('/enviar-factura',             autenticado, facturaController.enviarEmail);
 router.post  ('/test-email',                 autenticado, facturaController.testEmail);
 

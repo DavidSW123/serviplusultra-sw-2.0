@@ -132,7 +132,12 @@ async function inicializarDB() {
             `ALTER TABLE facturas ADD COLUMN aeat_error TEXT`,
             `ALTER TABLE facturas ADD COLUMN aeat_intentos INTEGER DEFAULT 0`,
             `ALTER TABLE facturas ADD COLUMN aeat_xml_enviado TEXT`,
-            `ALTER TABLE facturas ADD COLUMN aeat_respuesta TEXT`
+            `ALTER TABLE facturas ADD COLUMN aeat_respuesta TEXT`,
+            // Rectificativas
+            `ALTER TABLE facturas ADD COLUMN es_rectificativa INTEGER DEFAULT 0`,
+            `ALTER TABLE facturas ADD COLUMN factura_rectificada_id INTEGER`,
+            `ALTER TABLE facturas ADD COLUMN motivo_rectificacion TEXT`,
+            `ALTER TABLE facturas ADD COLUMN rectificada_por_id INTEGER`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }
