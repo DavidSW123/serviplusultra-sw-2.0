@@ -42,7 +42,13 @@ async function getAll(req, res) {
         const result = await db.execute(
             `SELECT ot.*, f.id AS factura_id, f.numero_factura, f.fecha_emision AS factura_fecha_emision, f.lineas AS factura_lineas, f.emails_enviados AS factura_emails_enviados, f.qr_data AS factura_qr, f.aeat_estado AS factura_aeat_estado, f.aeat_csv AS factura_aeat_csv, f.aeat_error AS factura_aeat_error, f.rectificada_por_id AS factura_rectificada_por_id, fr.numero_factura AS factura_rectificativa_numero
              FROM ordenes_trabajo ot
-             LEFT JOIN facturas f  ON f.ot_id = ot.id AND COALESCE(f.es_rectificativa, 0) = 0
+             LEFT JOIN facturas f  ON f.id = (
+                 SELECT id FROM facturas
+                 WHERE ot_id = ot.id
+                   AND COALESCE(es_rectificativa, 0) = 0
+                   AND rectificada_por_id IS NULL
+                 ORDER BY id DESC LIMIT 1
+             )
              LEFT JOIN facturas fr ON fr.id = f.rectificada_por_id
              ORDER BY ot.id DESC`
         );

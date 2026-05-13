@@ -138,9 +138,14 @@ async function emitir(req, res) {
     const { ot_id, codigo_ot, base_imponible, iva, total } = req.body;
 
     try {
-        // Factura ya existente → inmutable
+        // Factura ACTIVA (regular y no rectificada) → idempotente.
+        // Si la original fue rectificada se permite emitir una nueva con el siguiente correlativo.
         const existing = await db.execute({
-            sql:  `SELECT * FROM facturas WHERE ot_id = ?`,
+            sql:  `SELECT * FROM facturas
+                   WHERE ot_id = ?
+                     AND COALESCE(es_rectificativa, 0) = 0
+                     AND rectificada_por_id IS NULL
+                   ORDER BY id DESC LIMIT 1`,
             args: [ot_id]
         });
         if (existing.rows.length > 0) {
