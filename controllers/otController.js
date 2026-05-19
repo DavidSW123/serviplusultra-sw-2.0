@@ -46,8 +46,8 @@ async function getAll(req, res) {
                  SELECT id FROM facturas
                  WHERE ot_id = ot.id
                    AND COALESCE(es_rectificativa, 0) = 0
-                   AND rectificada_por_id IS NULL
-                 ORDER BY id DESC LIMIT 1
+                 ORDER BY CASE WHEN rectificada_por_id IS NULL THEN 0 ELSE 1 END, id DESC
+                 LIMIT 1
              )
              LEFT JOIN facturas fr ON fr.id = f.rectificada_por_id
              ORDER BY ot.id DESC`

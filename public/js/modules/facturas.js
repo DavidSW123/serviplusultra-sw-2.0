@@ -108,20 +108,32 @@ async function abrirGeneradorFactura(id) {
     const prevTag = document.getElementById('tagRectificada');
     if (prevTag) prevTag.remove();
 
-    // Botón rectificar: ocultar si ya rectificada
-    const btnRect = document.getElementById('btnRectificarFact');
-    if (btnRect) {
-        if (ot.factura_rectificada_por_id) {
-            btnRect.style.display = 'none';
-            const fNum = document.getElementById('factNumero');
-            if (fNum) {
-                const rectId = ot.factura_rectificada_por_id;
-                fNum.insertAdjacentHTML('afterend',
-                    ` <span id="tagRectificada" class="no-print" onclick="verRectificativa(${rectId})" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px; cursor:pointer;" title="Click para ver la rectificativa">📝 Rectificada por ${ot.factura_rectificativa_numero || ''} →</span>`);
-            }
-        } else {
-            btnRect.style.display = '';
+    // Botón rectificar y comportamiento de guardar cambian si la factura está rectificada
+    const btnRect    = document.getElementById('btnRectificarFact');
+    const btnGuardar = document.querySelector('#modalFactura [onclick="guardarCambiosFactura()"]');
+    if (ot.factura_rectificada_por_id) {
+        // Rectificada → preparamos refactura
+        if (btnRect) btnRect.style.display = 'none';
+        if (btnGuardar) btnGuardar.innerText = '📄 Emitir Refactura';
+        window._modoRefactura = true;
+        const fNum = document.getElementById('factNumero');
+        if (fNum) {
+            const rectId = ot.factura_rectificada_por_id;
+            fNum.insertAdjacentHTML('afterend',
+                ` <span id="tagRectificada" class="no-print" onclick="verRectificativa(${rectId})" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px; cursor:pointer;" title="Click para ver la rectificativa">📝 Rectificada por ${ot.factura_rectificativa_numero || ''} →</span>`);
         }
+        // Mostrar aviso visible
+        const factHeader = document.querySelector('.datos-factura');
+        if (factHeader && !document.getElementById('avisoRefactura')) {
+            factHeader.insertAdjacentHTML('beforeend',
+                `<div id="avisoRefactura" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">Esta factura está rectificada. Al pulsar <strong>Emitir Refactura</strong> se creará una nueva factura con el siguiente correlativo.</div>`);
+        }
+    } else {
+        if (btnRect) btnRect.style.display = '';
+        if (btnGuardar) btnGuardar.innerText = '💾 Guardar Cambios';
+        window._modoRefactura = false;
+        const aviso = document.getElementById('avisoRefactura');
+        if (aviso) aviso.remove();
     }
     abrirModal('modalFactura');
 }

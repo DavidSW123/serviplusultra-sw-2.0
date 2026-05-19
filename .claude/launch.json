@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start"],
       "port": 3000
+    },
+    {
+      "name": "Secretibiza Preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "C:/Users/SaizWeeD/Desktop/secretibiza/secretibiza/dist", "-l", "8000"],
+      "port": 8000
     }
   ]
 }
