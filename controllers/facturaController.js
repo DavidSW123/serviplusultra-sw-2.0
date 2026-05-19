@@ -447,4 +447,99 @@ async function listarRectificativas(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas };
+/**
+ * POST /api/facturas/:id/reasignar-numero
+ * Reasigna el numero_factura al hueco libre más bajo en la serie regular del año actual.
+ * Solo permitido si la factura:
+ *   - NO ha sido enviada al cliente (emails_enviados vacío)
+ *   - NO es rectificativa (las R- tienen su propia serie)
+ *   - Existe un hueco con número menor al actual
+ * Sincroniza QR y referencias en presupuestos.
+ */
+async function reasignarNumero(req, res) {
+    const { id } = req.params;
+    try {
+        const { rows } = await db.execute({
+            sql:  `SELECT * FROM facturas WHERE id=?`,
+            args: [id]
+        });
+        if (!rows[0]) return res.status(404).json({ error: 'Factura no encontrada' });
+        const f = rows[0];
+
+        // Validaciones
+        if (f.es_rectificativa) {
+            return res.status(400).json({ error: 'Las rectificativas usan su propia serie R-, no se renumeran a la regular.' });
+        }
+        let envios = [];
+        try { envios = JSON.parse(f.emails_enviados || '[]'); } catch (_) {}
+        if (Array.isArray(envios) && envios.length > 0) {
+            return res.status(400).json({ error: 'Esta factura ya se envió al cliente. Su número es inmutable.' });
+        }
+        if (!f.numero_factura) {
+            return res.status(400).json({ error: 'Esta factura aún no tiene número asignado.' });
+        }
+
+        // Extraer seq actual de su numero_factura
+        const mActual = f.numero_factura.match(/^(\d+)-(\d{4})/);
+        if (!mActual) return res.status(400).json({ error: 'Formato de número no reconocido.' });
+        const seqActual = parseInt(mActual[1]);
+
+        // Calcular hueco más bajo libre en la serie regular del año
+        const hoy = new Date();
+        const year = hoy.getFullYear();
+        const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
+        const dd   = String(hoy.getDate()).padStart(2, '0');
+        const { rows: rN } = await db.execute({
+            sql:  `SELECT CAST(SUBSTR(numero_factura, 1, INSTR(numero_factura, '-') - 1) AS INTEGER) AS seq
+                   FROM facturas
+                   WHERE numero_factura IS NOT NULL
+                     AND numero_factura NOT LIKE 'R-%'
+                     AND SUBSTR(numero_factura, INSTR(numero_factura, '-') + 1, 4) = ?
+                     AND id != ?
+                   ORDER BY seq ASC`,
+            args: [String(year), id]
+        });
+        const usados = new Set(rN.map(r => r.seq));
+        let seq = 1;
+        while (usados.has(seq)) seq++;
+
+        if (seq >= seqActual) {
+            return res.json({ ok: true, sinCambio: true, mensaje: 'No hay huecos por debajo del número actual.', numero_actual: f.numero_factura });
+        }
+
+        const seqStr     = seq < 100 ? String(seq).padStart(2, '0') : String(seq);
+        const nuevoNum   = `${seqStr}-${year}${mm}${dd}`;
+
+        // Regenerar QR
+        const textoQR = `NIF:B26892760|Factura:${nuevoNum}|Fecha:${f.fecha_emision}|Total:${f.total}EUR`;
+        const qr = await QRCode.toDataURL(textoQR);
+
+        // Actualizar la factura
+        await db.execute({
+            sql:  `UPDATE facturas SET numero_factura=?, qr_data=? WHERE id=?`,
+            args: [nuevoNum, qr, id]
+        });
+
+        // Sincronizar referencias en presupuestos si las hubiera
+        if (f.presupuesto_id) {
+            await db.execute({
+                sql:  `UPDATE presupuestos
+                       SET proforma_numero      = CASE WHEN proforma_numero      = ? THEN ? ELSE proforma_numero      END,
+                           factura_final_numero = CASE WHEN factura_final_numero = ? THEN ? ELSE factura_final_numero END
+                       WHERE id = ?`,
+                args: [f.numero_factura, nuevoNum, f.numero_factura, nuevoNum, f.presupuesto_id]
+            });
+        }
+
+        res.json({
+            ok: true,
+            numero_anterior: f.numero_factura,
+            numero_nuevo:    nuevoNum,
+            qr_data:         qr
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero };
