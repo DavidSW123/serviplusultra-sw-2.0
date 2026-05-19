@@ -57,8 +57,6 @@ router.post  ('/factura/lineas',             autenticado, facturaController.actu
 router.post  ('/factura/desde-presupuesto',  autenticado, facturaController.emitirDesdePresupuesto);
 router.post  ('/facturas/purgar-huerfanas',  soloAdmin,   facturaController.purgarHuerfanas);
 router.get   ('/facturas/diagnostico',       soloAdmin,   facturaController.diagnostico);
-router.post  ('/facturas/:id/aeat-reenviar', soloAdmin,   facturaController.reenviarAEAT);
-router.get   ('/facturas/:id/aeat-estado',   autenticado, facturaController.estadoAEAT);
 router.post  ('/facturas/:id/rectificar',    soloAdmin,   facturaController.rectificar);
 router.get   ('/facturas/rectificativas',    autenticado, facturaController.listarRectificativas);
 router.get   ('/facturas/:id',               autenticado, facturaController.getFactura);

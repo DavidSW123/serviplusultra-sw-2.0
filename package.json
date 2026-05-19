@@ -14,15 +14,12 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.17.2",
-    "axios": "^1.16.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "node-forge": "^1.4.0",
     "nodemailer": "^8.0.3",
     "qrcode": "^1.5.4",
-    "sqlite3": "^5.1.7",
-    "xmlbuilder2": "^4.0.3"
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

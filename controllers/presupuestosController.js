@@ -10,14 +10,12 @@ function _ahora() { return new Date().toLocaleString('es-ES'); }
 
 const MSG_FACTURA_PROTEGIDA = 'FACTURA YA ENVIADA A CLIENTE, POR FAVOR, EMITA ABONO DE ESTA FACTURA Y REFACTURAR EN UNA NUEVA.';
 
-/** Una factura está protegida (no se puede borrar) si ha sido enviada al cliente o registrada en AEAT. */
+/** Una factura está protegida (no se puede borrar) si ha sido enviada al cliente. */
 function _facturaProtegida(f) {
     if (!f) return false;
     let envios = [];
     try { envios = JSON.parse(f.emails_enviados || '[]'); } catch (_) { envios = []; }
-    if (Array.isArray(envios) && envios.length > 0) return true;
-    if (f.aeat_estado === 'ACEPTADO' || f.aeat_estado === 'PARCIAL') return true;
-    return false;
+    return Array.isArray(envios) && envios.length > 0;
 }
 
 /** Genera referencia PRES{YY}/NNNNN */
@@ -108,10 +106,10 @@ async function eliminar(req, res) {
     try {
         const { rows } = await db.execute({ sql: `SELECT referencia FROM presupuestos WHERE id=?`, args: [id] });
         const ref = rows[0]?.referencia || id;
-        // Si alguna factura vinculada está protegida (enviada al cliente / AEAT aceptado),
+        // Si alguna factura vinculada está protegida (enviada al cliente),
         // no se borra: se marca como eliminacion_pendiente para aprobación admin.
         const { rows: facts } = await db.execute({
-            sql:  `SELECT id, emails_enviados, aeat_estado FROM facturas WHERE presupuesto_id=?`,
+            sql:  `SELECT id, emails_enviados FROM facturas WHERE presupuesto_id=?`,
             args: [id]
         });
         const protegidas = facts.filter(_facturaProtegida);
@@ -251,9 +249,9 @@ async function eliminarFacturaAsociada(req, res) {
         const num = rows[0]?.num;
         if (!num) return res.status(404).json({ error: 'No hay factura de ese tipo asociada' });
 
-        // Si la factura está protegida (enviada al cliente / AEAT aceptado), marca pendiente de aprobación
+        // Si la factura está protegida (enviada al cliente), marca pendiente de aprobación
         const { rows: facts } = await db.execute({
-            sql:  `SELECT id, emails_enviados, aeat_estado FROM facturas WHERE numero_factura=? AND presupuesto_id=?`,
+            sql:  `SELECT id, emails_enviados FROM facturas WHERE numero_factura=? AND presupuesto_id=?`,
             args: [num, id]
         });
         const protegidas = facts.filter(_facturaProtegida);

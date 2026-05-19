@@ -100,14 +100,14 @@ async function abrirGeneradorFactura(id) {
 
     renderizarTablaFactura();
     _renderBadgeEnviada(ot.factura_emails_enviados);
-    _renderQRVeriFactu(ot.factura_qr);
-    _renderBadgeAEAT(ot.factura_aeat_estado, ot.factura_aeat_error);
+    _renderQRFactura(ot.factura_qr);
     _renderBadgePendienteElim(ot.factura_eliminacion_pendiente);
     window._facturaActualId = ot.factura_id || null;
 
-    // Limpiar etiqueta "Rectificada por..." previa si la hubiera
-    const prevTag = document.getElementById('tagRectificada');
-    if (prevTag) prevTag.remove();
+    // Limpiar TODAS las badges dinámicas previas
+    ['tagRectificada','tagHistorial','badgePendienteElim'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.remove();
+    });
 
     // Restablecer botones por defecto
     const btnRect    = document.getElementById('btnRectificarFact');
@@ -174,45 +174,6 @@ function _renderBadgePendienteElim(pendiente) {
     if (!wrap) return;
     wrap.insertAdjacentHTML('beforeend',
         `<span id="badgePendienteElim" class="fact-pill fact-pill-orange fact-pill-static" title="Esta factura tiene una solicitud de eliminación pendiente de admin">⚠️ Pendiente eliminación</span>`);
-}
-
-function _renderBadgeAEAT(estado, error) {
-    const badge = document.getElementById('badgeAEAT');
-    if (!badge) return;
-    if (!estado || estado === 'DESACTIVADO' || estado === 'PENDIENTE') { badge.style.display = 'none'; return; }
-    const classMap = {
-        ACEPTADO:  { cls:'fact-pill-green',  txt:'✓ AEAT Aceptada' },
-        PARCIAL:   { cls:'fact-pill-yellow', txt:'⚠ AEAT Parcial' },
-        RECHAZADO: { cls:'fact-pill-red',    txt:'✗ AEAT Rechazada' },
-        ERROR:     { cls:'fact-pill-red',    txt:'⚠ AEAT Error' }
-    };
-    const c = classMap[estado] || { cls:'fact-pill-grey', txt: 'AEAT ' + estado };
-    badge.className = 'fact-pill ' + c.cls;
-    badge.innerText = c.txt;
-    badge.title = error || `Estado AEAT: ${estado}`;
-    badge.style.display = 'inline-flex';
-}
-
-async function verEstadoAEAT() {
-    const id = window._facturaActualId;
-    if (!id) { alert('No hay factura con ID asociado todavía. Guarda primero los cambios.'); return; }
-    const r = await API.get(`/api/facturas/${id}/aeat-estado`);
-    const cont = document.getElementById('contEstadoAEAT');
-    if (r.error) { cont.innerHTML = `<p style="color:#e74c3c;">${r.error}</p>`; }
-    else {
-        cont.innerHTML = `
-            <p><strong>Nº Factura:</strong> ${r.numero_factura}</p>
-            <p><strong>Estado:</strong> ${r.aeat_estado || '—'}</p>
-            <p><strong>CSV AEAT:</strong> ${r.aeat_csv || '—'}</p>
-            <p><strong>Huella:</strong> <span style="word-break:break-all;">${r.aeat_huella || '—'}</span></p>
-            <p><strong>Huella anterior:</strong> <span style="word-break:break-all;">${r.aeat_huella_anterior || '(primera)'}</span></p>
-            <p><strong>Fecha envío:</strong> ${r.aeat_fecha_envio || '—'}</p>
-            <p><strong>Intentos:</strong> ${r.aeat_intentos || 0}</p>
-            ${r.aeat_error ? `<p style="color:#e74c3c;"><strong>Error:</strong> ${r.aeat_error}</p>` : ''}
-            ${r.aeat_respuesta ? `<details><summary>Respuesta AEAT (raw)</summary><pre style="white-space:pre-wrap; font-size:0.75em; max-height:200px; overflow:auto;">${r.aeat_respuesta.replace(/</g,'&lt;')}</pre></details>` : ''}
-        `;
-    }
-    abrirModal('modalEstadoAEAT');
 }
 
 // ── Rectificativa ──────────────────────────────────────────────
@@ -398,16 +359,23 @@ async function verRectificativa(facturaId) {
 
     renderizarTablaFactura();
     _renderBadgeEnviada(f.emails_enviados);
-    _renderQRVeriFactu(f.qr_data);
-    _renderBadgeAEAT(f.aeat_estado, f.aeat_error);
-
+    _renderQRFactura(f.qr_data);
     // Limpiar tag previa y añadir aviso de "es rectificativa de XX"
-    const prevTag = document.getElementById('tagRectificada');
-    if (prevTag) prevTag.remove();
+    // Limpiar TODOS los badges dinámicos previos antes de pintar los de esta factura
+    ['tagRectificada','tagHistorial','badgePendienteElim'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.remove();
+    });
     const wrap = document.getElementById('factBadgesWrap');
     if (wrap) {
-        wrap.insertAdjacentHTML('beforeend',
-            `<span id="tagRectificada" class="fact-pill fact-pill-orange fact-pill-static" title="${(f.motivo_rectificacion || '').replace(/"/g,'&quot;')}">📝 Rectificativa de ${f.rectifica_a_numero || ''}</span>`);
+        if (f.es_rectificativa) {
+            // Es la propia rectificativa: muestra a qué original anula (estático, ya estás dentro)
+            wrap.insertAdjacentHTML('beforeend',
+                `<span id="tagRectificada" class="fact-pill fact-pill-orange fact-pill-static" title="${(f.motivo_rectificacion || '').replace(/"/g,'&quot;')}">📝 Rectificativa de ${f.rectifica_a_numero || ''}</span>`);
+        } else if (f.rectificada_por_id) {
+            // Es la factura ORIGINAL rectificada: badge clickable que abre la rectificativa
+            wrap.insertAdjacentHTML('beforeend',
+                `<span id="tagRectificada" class="fact-pill fact-pill-orange" onclick="verRectificativa(${f.rectificada_por_id})" title="Click para ver la rectificativa">📝 Rectificada por ${f.rectificada_por_numero || ''} →</span>`);
+        }
     }
 
     // Ocultar botón "Emitir Rectificativa" (no se puede rectificar una rectificativa)
@@ -436,17 +404,7 @@ async function confirmarRectificar() {
     cerrarModal('modalFactura');
 }
 
-async function reenviarAEAT() {
-    const id = window._facturaActualId;
-    if (!id) return;
-    const r = await API.post(`/api/facturas/${id}/aeat-reenviar`, {});
-    alert(r.ok ? `✅ AEAT: ${r.estado} ${r.csv ? '(CSV: '+r.csv+')' : ''}` : `❌ ${r.error || r.estado}`);
-    await verEstadoAEAT();
-    // Refrescar lista global
-    try { const frescas = await API.get('/api/ot'); if (Array.isArray(frescas)) otsGlobal = frescas; } catch (_) {}
-}
-
-function _renderQRVeriFactu(qrDataUrl) {
+function _renderQRFactura(qrDataUrl) {
     const bloque = document.getElementById('bloqueQRFact');
     const img    = document.getElementById('factQRImg');
     if (!bloque || !img) return;
@@ -587,7 +545,7 @@ async function _emitirYRegistrar() {
         document.getElementById('factFechaHoy').innerText = data.fecha_emision
             ? new Date(data.fecha_emision + 'T00:00:00').toLocaleDateString('es-ES')
             : new Date().toLocaleDateString('es-ES');
-        if (data.qr_data) _renderQRVeriFactu(data.qr_data);
+        if (data.qr_data) _renderQRFactura(data.qr_data);
     }
     return data;
 }

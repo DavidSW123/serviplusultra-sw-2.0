@@ -9,7 +9,7 @@ async function listarPendientes(req, res) {
     try {
         const { rows } = await db.execute(`
             SELECT f.id, f.numero_factura, f.fecha_emision, f.base_imponible, f.iva, f.total,
-                   f.emails_enviados, f.aeat_estado, f.es_rectificativa,
+                   f.emails_enviados, f.es_rectificativa,
                    f.ot_id, f.presupuesto_id,
                    ot.codigo_ot,
                    p.referencia AS presupuesto_ref,

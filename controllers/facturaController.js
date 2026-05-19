@@ -1,34 +1,5 @@
 const QRCode    = require('qrcode');
 const { db }    = require('../config/db');
-const verifactu = require('../services/verifactu');
-
-// NIF emisor (sin guion, formato AEAT)
-const NIF_EMISOR = (process.env.NIF_EMISOR || 'B26892760').replace(/-/g, '');
-// VeriFactu: prewww2 = entorno pruebas, www2 = producción
-const VERIFACTU_BASE = process.env.VERIFACTU_BASE
-    || 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR';
-
-/**
- * Genera la URL VeriFactu del QR según especificación AEAT.
- * Formato: BASE?nif=...&numserie=...&fecha=DD-MM-YYYY&importe=NN.NN
- */
-function _urlVeriFactu(numero_factura, fechaISO, importe) {
-    const [yyyy, mm, dd] = (fechaISO || '').split('-');
-    const fechaParam = `${dd}-${mm}-${yyyy}`;
-    const importeFmt = parseFloat(importe || 0).toFixed(2);
-    const params = new URLSearchParams({
-        nif:      NIF_EMISOR,
-        numserie: numero_factura,
-        fecha:    fechaParam,
-        importe:  importeFmt
-    });
-    return `${VERIFACTU_BASE}?${params.toString()}`;
-}
-
-async function _generarQRVeriFactu(numero_factura, fechaISO, total) {
-    const url = _urlVeriFactu(numero_factura, fechaISO, total);
-    return await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 1, width: 220 });
-}
 
 const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
     || 'https://script.google.com/macros/s/AKfycbxwi8cCg4D0mGEK_Xh3V52AHMf31ESpvEbfmXgLNSw-k9GMt9_wauc3GicRqUvT9AkEow/exec';
@@ -160,19 +131,14 @@ async function emitir(req, res) {
 
         const fecha          = new Date().toISOString().split('T')[0];
         const numero_factura = await generarNumeroFactura();
-        const qr             = await _generarQRVeriFactu(numero_factura, fecha, total);
+        const textoQR        = `NIF:B26892760|Factura:${numero_factura}|Fecha:${fecha}|Total:${total}EUR`;
+        const qr             = await QRCode.toDataURL(textoQR);
 
-        const r = await db.execute({
+        await db.execute({
             sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura)
                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
             args: [ot_id, base_imponible, iva, total, qr, fecha, numero_factura]
         });
-
-        // Envío async a AEAT (no bloquea respuesta)
-        const facturaId = Number(r.lastInsertRowid);
-        verifactu.enviarFactura(facturaId)
-            .then(rs => console.log(`📤 AEAT ${numero_factura}: ${rs.estado || (rs.ok?'OK':'ERROR')} ${rs.csv?'CSV='+rs.csv:''} ${rs.error?'ERR='+rs.error:''}`))
-            .catch(e  => console.error(`📤 AEAT ${numero_factura} fallo:`, e.message));
 
         res.json({ mensaje: 'Factura emitida', qr_data: qr, numero_factura, fecha_emision: fecha });
     } catch (e) {
@@ -294,18 +260,13 @@ async function emitirDesdePresupuesto(req, res) {
         const fecha          = new Date().toISOString().split('T')[0];
         const numero_factura = await generarNumeroFactura();
 
-        const qr = await _generarQRVeriFactu(numero_factura, fecha, total);
-        const r = await db.execute({
+        const textoQR = `NIF:B26892760|Factura:${numero_factura}|Fecha:${fecha}|Total:${total}EUR`;
+        const qr = await QRCode.toDataURL(textoQR);
+        await db.execute({
             sql:  `INSERT INTO facturas (presupuesto_id, base_imponible, iva, total, fecha_emision, numero_factura, lineas, qr_data)
                    VALUES (?,?,?,?,?,?,?,?)`,
             args: [presupuesto_id, base_imponible, iva, total, fecha, numero_factura, JSON.stringify(lineas || []), qr]
         });
-
-        // Envío async a AEAT
-        const facturaId = Number(r.lastInsertRowid);
-        verifactu.enviarFactura(facturaId)
-            .then(rs => console.log(`📤 AEAT ${numero_factura}: ${rs.estado || (rs.ok?'OK':'ERROR')} ${rs.csv?'CSV='+rs.csv:''} ${rs.error?'ERR='+rs.error:''}`))
-            .catch(e  => console.error(`📤 AEAT ${numero_factura} fallo:`, e.message));
 
         const campoTotal = tipo === 'proforma' ? ', proforma_total=?' : '';
         const args = tipo === 'proforma'
@@ -373,40 +334,6 @@ async function diagnostico(req, res) {
 }
 
 /**
- * POST /api/facturas/:id/aeat-reenviar
- * Reenvía a AEAT una factura (útil tras error o ERROR previo).
- */
-async function reenviarAEAT(req, res) {
-    const { id } = req.params;
-    try {
-        const r = await verifactu.enviarFactura(parseInt(id));
-        res.json(r);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-}
-
-/**
- * GET /api/facturas/:id/aeat-estado
- * Devuelve el estado AEAT de una factura.
- */
-async function estadoAEAT(req, res) {
-    const { id } = req.params;
-    try {
-        const { rows } = await db.execute({
-            sql:  `SELECT id, numero_factura, aeat_estado, aeat_csv, aeat_huella, aeat_huella_anterior,
-                          aeat_fecha_envio, aeat_error, aeat_intentos, aeat_respuesta
-                   FROM facturas WHERE id=?`,
-            args: [id]
-        });
-        if (!rows[0]) return res.status(404).json({ error: 'No encontrada' });
-        res.json(rows[0]);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-}
-
-/**
  * POST /api/facturas/:id/rectificar
  * Body: { lineas, base_imponible, iva, total, motivo }
  * Crea una factura rectificativa vinculada a la original y la marca como "rectificada_por".
@@ -428,7 +355,8 @@ async function rectificar(req, res) {
 
         const fecha   = new Date().toISOString().split('T')[0];
         const numeroR = await generarNumeroRectificativa();
-        const qr      = await _generarQRVeriFactu(numeroR, fecha, total);
+        const textoQR = `NIF:B26892760|Factura:${numeroR}|Fecha:${fecha}|Total:${total}EUR`;
+        const qr      = await QRCode.toDataURL(textoQR);
 
         const r = await db.execute({
             sql:  `INSERT INTO facturas
@@ -448,11 +376,6 @@ async function rectificar(req, res) {
             sql:  `UPDATE facturas SET rectificada_por_id=? WHERE id=?`,
             args: [newId, orig.id]
         });
-
-        // Envío AEAT async (no bloquea)
-        verifactu.enviarFactura(newId)
-            .then(rs => console.log(`📤 AEAT ${numeroR}: ${rs.estado || (rs.ok?'OK':'ERROR')} ${rs.csv?'CSV='+rs.csv:''}`))
-            .catch(e  => console.error(`📤 AEAT ${numeroR} fallo:`, e.message));
 
         res.json({
             ok: true,
@@ -480,11 +403,14 @@ async function getFactura(req, res) {
             sql: `SELECT f.*,
                          ot.codigo_ot,
                          p.referencia AS presupuesto_ref,
-                         orig.numero_factura AS rectifica_a_numero
+                         orig.numero_factura AS rectifica_a_numero,
+                         rect.id          AS rectificada_por_id_join,
+                         rect.numero_factura AS rectificada_por_numero
                   FROM facturas f
                   LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
                   LEFT JOIN presupuestos    p  ON p.id  = f.presupuesto_id
                   LEFT JOIN facturas        orig ON orig.id = f.factura_rectificada_id
+                  LEFT JOIN facturas        rect ON rect.id = f.rectificada_por_id
                   WHERE f.id = ?`,
             args: [id]
         });
@@ -521,4 +447,4 @@ async function listarRectificativas(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, reenviarAEAT, estadoAEAT, rectificar, getFactura, listarRectificativas };
+module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas };
