@@ -108,32 +108,51 @@ async function abrirGeneradorFactura(id) {
     const prevTag = document.getElementById('tagRectificada');
     if (prevTag) prevTag.remove();
 
-    // Botón rectificar y comportamiento de guardar cambian si la factura está rectificada
+    // Restablecer botones por defecto
     const btnRect    = document.getElementById('btnRectificarFact');
     const btnGuardar = document.querySelector('#modalFactura [onclick="guardarCambiosFactura()"]');
+    const btnEmail   = document.querySelector('#modalFactura [onclick="enviarFacturaAlCliente()"]');
+    const btnPDF     = document.querySelector('#modalFactura [onclick="descargarFacturaPDF()"]');
+    if (btnGuardar) { btnGuardar.innerText = '💾 Guardar Cambios'; btnGuardar.style.display = ''; }
+    if (btnEmail)   btnEmail.style.display = '';
+    if (btnPDF)     btnPDF.style.display = '';
+    if (btnRect)    btnRect.style.display = '';
+    const avisoPrev = document.getElementById('avisoRefactura');
+    if (avisoPrev) avisoPrev.remove();
+    const btnRefacPrev = document.getElementById('btnRefacturar');
+    if (btnRefacPrev) btnRefacPrev.remove();
+    window._modoRefactura = false;
+
     if (ot.factura_rectificada_por_id) {
-        // Rectificada → preparamos refactura
-        if (btnRect) btnRect.style.display = 'none';
-        if (btnGuardar) btnGuardar.innerText = '📄 Emitir Refactura';
-        window._modoRefactura = true;
+        // Factura rectificada (anulada) → modo solo lectura.
+        // Refacturar es OPCIONAL, no obligatorio (puede ser solo abono).
+        if (btnRect)    btnRect.style.display = 'none';
+        if (btnGuardar) btnGuardar.style.display = 'none';
+        if (btnEmail)   btnEmail.style.display = 'none';
+
         const fNum = document.getElementById('factNumero');
         if (fNum) {
             const rectId = ot.factura_rectificada_por_id;
             fNum.insertAdjacentHTML('afterend',
                 ` <span id="tagRectificada" class="no-print" onclick="verRectificativa(${rectId})" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px; cursor:pointer;" title="Click para ver la rectificativa">📝 Rectificada por ${ot.factura_rectificativa_numero || ''} →</span>`);
         }
-        // Mostrar aviso visible
         const factHeader = document.querySelector('.datos-factura');
-        if (factHeader && !document.getElementById('avisoRefactura')) {
+        if (factHeader) {
             factHeader.insertAdjacentHTML('beforeend',
-                `<div id="avisoRefactura" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">Esta factura está rectificada. Al pulsar <strong>Emitir Refactura</strong> se creará una nueva factura con el siguiente correlativo.</div>`);
+                `<div id="avisoRefactura" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">Esta factura está <strong>anulada</strong> por la rectificativa. Si la anulación es solo un abono, no necesita más acción. Si necesitas emitir una nueva factura, pulsa <em>Emitir Refactura</em>.</div>`);
+        }
+        // Inyectar botón refactura como opción explícita (al final de la botonera)
+        const botoneraFactura = document.querySelector('#modalFactura .no-print > button')?.parentNode;
+        if (botoneraFactura && !document.getElementById('btnRefacturar')) {
+            const btn = document.createElement('button');
+            btn.id = 'btnRefacturar';
+            btn.className = 'btn-secundario';
+            btn.style.cssText = 'flex-grow:1; padding:14px; font-size:15px; background-color:#3498db; color:#fff;';
+            btn.innerText = '📄 Emitir Refactura';
+            btn.onclick = () => { window._modoRefactura = true; guardarCambiosFactura(); };
+            botoneraFactura.appendChild(btn);
         }
     } else {
-        if (btnRect) btnRect.style.display = '';
-        if (btnGuardar) btnGuardar.innerText = '💾 Guardar Cambios';
-        window._modoRefactura = false;
-        const aviso = document.getElementById('avisoRefactura');
-        if (aviso) aviso.remove();
 
         // Si esta factura es una refactura (existe factura anterior rectificada en la misma OT),
         // mostrar el historial como badge clickable.
