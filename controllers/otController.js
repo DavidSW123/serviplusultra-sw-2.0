@@ -40,7 +40,8 @@ async function _insertarMateriales(otId, lineas) {
 async function getAll(req, res) {
     try {
         const result = await db.execute(
-            `SELECT ot.*, f.id AS factura_id, f.numero_factura, f.fecha_emision AS factura_fecha_emision, f.lineas AS factura_lineas, f.emails_enviados AS factura_emails_enviados, f.qr_data AS factura_qr, f.aeat_estado AS factura_aeat_estado, f.aeat_csv AS factura_aeat_csv, f.aeat_error AS factura_aeat_error, f.rectificada_por_id AS factura_rectificada_por_id, fr.numero_factura AS factura_rectificativa_numero
+            `SELECT ot.*, f.id AS factura_id, f.numero_factura, f.fecha_emision AS factura_fecha_emision, f.lineas AS factura_lineas, f.emails_enviados AS factura_emails_enviados, f.qr_data AS factura_qr, f.aeat_estado AS factura_aeat_estado, f.aeat_csv AS factura_aeat_csv, f.aeat_error AS factura_aeat_error, f.rectificada_por_id AS factura_rectificada_por_id, fr.numero_factura AS factura_rectificativa_numero,
+                fant.id AS factura_anterior_id, fant.numero_factura AS factura_anterior_numero, fr2.numero_factura AS factura_anterior_rectificativa
              FROM ordenes_trabajo ot
              LEFT JOIN facturas f  ON f.id = (
                  SELECT id FROM facturas
@@ -50,6 +51,15 @@ async function getAll(req, res) {
                  LIMIT 1
              )
              LEFT JOIN facturas fr ON fr.id = f.rectificada_por_id
+             LEFT JOIN facturas fant ON fant.id = (
+                 SELECT id FROM facturas
+                 WHERE ot_id = ot.id
+                   AND COALESCE(es_rectificativa, 0) = 0
+                   AND rectificada_por_id IS NOT NULL
+                   AND id != COALESCE(f.id, 0)
+                 ORDER BY id DESC LIMIT 1
+             )
+             LEFT JOIN facturas fr2 ON fr2.id = fant.rectificada_por_id
              ORDER BY ot.id DESC`
         );
         res.json(result.rows);

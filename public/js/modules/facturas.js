@@ -134,6 +134,18 @@ async function abrirGeneradorFactura(id) {
         window._modoRefactura = false;
         const aviso = document.getElementById('avisoRefactura');
         if (aviso) aviso.remove();
+
+        // Si esta factura es una refactura (existe factura anterior rectificada en la misma OT),
+        // mostrar el historial como badge clickable.
+        const prevHist = document.getElementById('tagHistorial');
+        if (prevHist) prevHist.remove();
+        if (ot.factura_anterior_id) {
+            const fNum = document.getElementById('factNumero');
+            if (fNum) {
+                fNum.insertAdjacentHTML('afterend',
+                    ` <span id="tagHistorial" class="no-print" onclick="abrirFacturaAnterior(${ot.factura_anterior_id})" style="background:#3498db; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px; cursor:pointer;" title="Click para ver la factura anterior rectificada">📜 Refactura de ${ot.factura_anterior_numero}${ot.factura_anterior_rectificativa ? ' (rect. ' + ot.factura_anterior_rectificativa + ')' : ''} →</span>`);
+            }
+        }
     }
     abrirModal('modalFactura');
 }
@@ -225,6 +237,13 @@ function _renderLineasRect() {
 function rectActualizarLinea(i, c, v) { lineasRect[i][c] = c === 'concepto' ? v : (parseFloat(v) || 0); _renderLineasRect(); }
 function rectAgregarLinea()           { lineasRect.push({ concepto: '', cantidad: 1, precio: 0 }); _renderLineasRect(); }
 function rectBorrarLinea(i)           { lineasRect.splice(i, 1); _renderLineasRect(); }
+
+/** Abre una factura por su id (factura regular rectificada, para ver el historial). */
+async function abrirFacturaAnterior(facturaId) {
+    if (!facturaId) return;
+    // Reutilizamos verRectificativa que pinta cualquier factura por id en el modal completo.
+    await verRectificativa(facturaId);
+}
 
 /** Listado global de facturas rectificativas. */
 async function verListaRectificativas() {
