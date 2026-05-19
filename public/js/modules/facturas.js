@@ -102,6 +102,7 @@ async function abrirGeneradorFactura(id) {
     _renderBadgeEnviada(ot.factura_emails_enviados);
     _renderQRVeriFactu(ot.factura_qr);
     _renderBadgeAEAT(ot.factura_aeat_estado, ot.factura_aeat_error);
+    _renderBadgePendienteElim(ot.factura_eliminacion_pendiente);
     window._facturaActualId = ot.factura_id || null;
 
     // Limpiar etiqueta "Rectificada por..." previa si la hubiera
@@ -167,6 +168,17 @@ async function abrirGeneradorFactura(id) {
         }
     }
     abrirModal('modalFactura');
+}
+
+function _renderBadgePendienteElim(pendiente) {
+    // Quitar badge previo
+    const prev = document.getElementById('badgePendienteElim');
+    if (prev) prev.remove();
+    if (!pendiente) return;
+    const fNum = document.getElementById('factNumero');
+    if (!fNum) return;
+    fNum.insertAdjacentHTML('afterend',
+        ` <span id="badgePendienteElim" class="no-print" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px;" title="Esta factura tiene una solicitud de eliminación pendiente de admin">⚠️ Pendiente eliminación</span>`);
 }
 
 function _renderBadgeAEAT(estado, error) {
@@ -262,6 +274,80 @@ async function abrirFacturaAnterior(facturaId) {
     if (!facturaId) return;
     // Reutilizamos verRectificativa que pinta cualquier factura por id en el modal completo.
     await verRectificativa(facturaId);
+}
+
+// ── Solicitudes de eliminación de facturas (admin) ────────────
+
+/** Refresca el badge naranja "Solicitudes eliminación" en top bar (solo admin con pendientes). */
+async function _actualizarBadgeSolicitudesElim() {
+    const btn = document.getElementById('btnSolicitudesElim');
+    if (!btn) return;
+    if (!sesion || sesion.rol !== 'admin') { btn.style.display = 'none'; return; }
+    try {
+        const r = await API.get('/api/admin/facturas/pendientes-eliminacion');
+        if (Array.isArray(r) && r.length > 0) {
+            btn.style.display = '';
+            btn.innerText = `⚠️ Solicitudes eliminación (${r.length})`;
+        } else {
+            btn.style.display = 'none';
+        }
+    } catch (_) { btn.style.display = 'none'; }
+}
+
+async function verSolicitudesEliminacion() {
+    const lista = await API.get('/api/admin/facturas/pendientes-eliminacion');
+    const tbody = document.getElementById('tbodySolicitudesElim');
+    if (!Array.isArray(lista) || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#888; padding:20px;">No hay solicitudes pendientes.</td></tr>';
+    } else {
+        tbody.innerHTML = lista.map(f => {
+            const tipo = f.es_rectificativa ? '📝 Rectificativa' : '📄 Regular';
+            return `<tr>
+                <td><strong>${f.numero_factura}</strong></td>
+                <td>${f.fecha_emision || '—'}</td>
+                <td>${f.cliente_nombre || '—'}</td>
+                <td>${f.codigo_ot || f.presupuesto_ref || '—'}</td>
+                <td style="text-align:right;"><strong>${parseFloat(f.total||0).toFixed(2)} €</strong></td>
+                <td>${tipo}</td>
+                <td style="text-align:center;">
+                    <button class="btn-secundario" style="background:#27ae60; color:#fff; padding:5px 10px; font-size:0.82em;" onclick="aprobarEliminacionFact(${f.id})">✓ Aprobar</button>
+                    <button class="btn-secundario" style="background:#95a5a6; color:#fff; padding:5px 10px; font-size:0.82em;" onclick="rechazarEliminacionFact(${f.id})">✕ Rechazar</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+    abrirModal('modalSolicitudesElim');
+}
+
+async function aprobarEliminacionFact(id) {
+    if (!confirm('¿Aprobar eliminación? La factura se borrará definitivamente y su número quedará libre para gap-fill.')) return;
+    const r = await API.post(`/api/admin/facturas/${id}/aprobar-eliminacion`, {});
+    if (r.ok) {
+        alert(`✅ Factura ${r.numero_eliminado || ''} eliminada. Número liberado.`);
+        try { const frescas = await API.get('/api/ot'); if (Array.isArray(frescas)) otsGlobal = frescas; } catch (_) {}
+        verSolicitudesEliminacion();
+        _actualizarBadgeSolicitudesElim();
+    } else {
+        alert('❌ ' + (r.error || 'Error desconocido'));
+    }
+}
+
+async function rechazarEliminacionFact(id) {
+    if (!confirm('¿Rechazar la solicitud? La factura seguirá activa.')) return;
+    const r = await API.post(`/api/admin/facturas/${id}/rechazar-eliminacion`, {});
+    if (r.ok) {
+        alert('✅ Solicitud rechazada. La factura sigue activa.');
+        verSolicitudesEliminacion();
+        _actualizarBadgeSolicitudesElim();
+    } else {
+        alert('❌ ' + (r.error || 'Error desconocido'));
+    }
+}
+
+// Refrescar badge al cargar y cada cierto tiempo
+if (typeof window !== 'undefined') {
+    setTimeout(_actualizarBadgeSolicitudesElim, 2000);
+    setInterval(_actualizarBadgeSolicitudesElim, 60000);
 }
 
 /** Listado global de facturas rectificativas. */

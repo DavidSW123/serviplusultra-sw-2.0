@@ -108,13 +108,22 @@ async function eliminar(req, res) {
     try {
         const { rows } = await db.execute({ sql: `SELECT referencia FROM presupuestos WHERE id=?`, args: [id] });
         const ref = rows[0]?.referencia || id;
-        // Comprobar si alguna factura vinculada está protegida (enviada al cliente / registrada en AEAT)
+        // Si alguna factura vinculada está protegida (enviada al cliente / AEAT aceptado),
+        // no se borra: se marca como eliminacion_pendiente para aprobación admin.
         const { rows: facts } = await db.execute({
-            sql:  `SELECT emails_enviados, aeat_estado FROM facturas WHERE presupuesto_id=?`,
+            sql:  `SELECT id, emails_enviados, aeat_estado FROM facturas WHERE presupuesto_id=?`,
             args: [id]
         });
-        if (facts.some(_facturaProtegida)) {
-            return res.status(403).json({ error: MSG_FACTURA_PROTEGIDA });
+        const protegidas = facts.filter(_facturaProtegida);
+        if (protegidas.length > 0) {
+            for (const f of protegidas) {
+                await db.execute({
+                    sql:  `UPDATE facturas SET eliminacion_pendiente=1 WHERE id=?`,
+                    args: [f.id]
+                });
+            }
+            await registrarLog(usuario, 'Solicitar eliminación presupuesto', ref, { id, facturas: protegidas.map(f => f.id) }, 'PENDIENTE');
+            return res.status(202).json({ mensaje: 'FACTURA YA ENVIADA A CLIENTE. Solicitud de eliminación enviada, pendiente de autorización por un administrador.' });
         }
         // Borrar facturas vinculadas (proforma/final) para liberar sus números y que el gap-fill los reasigne
         await db.execute({ sql: `DELETE FROM facturas WHERE presupuesto_id=?`, args: [id] });
@@ -242,13 +251,21 @@ async function eliminarFacturaAsociada(req, res) {
         const num = rows[0]?.num;
         if (!num) return res.status(404).json({ error: 'No hay factura de ese tipo asociada' });
 
-        // Verifica protección: si esta factura fue enviada al cliente / aceptada por AEAT → no se puede borrar
+        // Si la factura está protegida (enviada al cliente / AEAT aceptado), marca pendiente de aprobación
         const { rows: facts } = await db.execute({
-            sql:  `SELECT emails_enviados, aeat_estado FROM facturas WHERE numero_factura=? AND presupuesto_id=?`,
+            sql:  `SELECT id, emails_enviados, aeat_estado FROM facturas WHERE numero_factura=? AND presupuesto_id=?`,
             args: [num, id]
         });
-        if (facts.some(_facturaProtegida)) {
-            return res.status(403).json({ error: MSG_FACTURA_PROTEGIDA });
+        const protegidas = facts.filter(_facturaProtegida);
+        if (protegidas.length > 0) {
+            for (const f of protegidas) {
+                await db.execute({
+                    sql:  `UPDATE facturas SET eliminacion_pendiente=1 WHERE id=?`,
+                    args: [f.id]
+                });
+            }
+            await registrarLog(usuario, `Solicitar eliminación factura ${tipo}`, `ID:${id}`, { numero: num, facturas: protegidas.map(f => f.id) }, 'PENDIENTE');
+            return res.status(202).json({ mensaje: 'FACTURA YA ENVIADA A CLIENTE. Solicitud de eliminación enviada, pendiente de autorización por un administrador.' });
         }
 
         // Borra la factura (libera su número) y limpia los campos del presupuesto

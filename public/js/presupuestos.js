@@ -206,8 +206,10 @@ async function eliminarFacturaAsociada(presId, tipo) {
         const p = presupuestosGlobal.find(x => x.id === presId);
         if (p) _renderFacturasAsociadas(p);
         filtrarPresupuestos();
+    } else if (res.mensaje) {
+        alert('⚠️ ' + res.mensaje);
     } else {
-        alert('Error: ' + (res.error || 'desconocido'));
+        alert('❌ ' + (res.error || 'desconocido'));
     }
 }
 
@@ -296,6 +298,10 @@ async function eliminarPresupuesto(id) {
     if (res.ok) {
         presupuestosGlobal = presupuestosGlobal.filter(p => p.id !== id);
         filtrarPresupuestos();
+    } else if (res.mensaje) {
+        alert('⚠️ ' + res.mensaje);
+    } else if (res.error) {
+        alert('❌ ' + res.error);
     }
 }
 

@@ -41,7 +41,8 @@ async function getAll(req, res) {
     try {
         const result = await db.execute(
             `SELECT ot.*, f.id AS factura_id, f.numero_factura, f.fecha_emision AS factura_fecha_emision, f.lineas AS factura_lineas, f.emails_enviados AS factura_emails_enviados, f.qr_data AS factura_qr, f.aeat_estado AS factura_aeat_estado, f.aeat_csv AS factura_aeat_csv, f.aeat_error AS factura_aeat_error, f.rectificada_por_id AS factura_rectificada_por_id, fr.numero_factura AS factura_rectificativa_numero,
-                fant.id AS factura_anterior_id, fant.numero_factura AS factura_anterior_numero, fr2.numero_factura AS factura_anterior_rectificativa
+                fant.id AS factura_anterior_id, fant.numero_factura AS factura_anterior_numero, fr2.numero_factura AS factura_anterior_rectificativa,
+                f.eliminacion_pendiente AS factura_eliminacion_pendiente
              FROM ordenes_trabajo ot
              LEFT JOIN facturas f  ON f.id = (
                  SELECT id FROM facturas
@@ -233,20 +234,28 @@ async function eliminar(req, res) {
     }
 
     try {
-        // Bloquea borrado si hay factura ya enviada al cliente o aceptada en AEAT
+        // Si hay factura protegida (enviada al cliente o aceptada en AEAT),
+        // no se borra: se marca como eliminacion_pendiente para que un admin la apruebe.
         const { rows: facts } = await db.execute({
-            sql:  `SELECT emails_enviados, aeat_estado FROM facturas WHERE ot_id = ?`,
+            sql:  `SELECT id, emails_enviados, aeat_estado FROM facturas WHERE ot_id = ?`,
             args: [id]
         });
-        const protegida = facts.some(f => {
+        const protegidas = facts.filter(f => {
             let envios = [];
             try { envios = JSON.parse(f.emails_enviados || '[]'); } catch (_) {}
             return (Array.isArray(envios) && envios.length > 0)
                 || f.aeat_estado === 'ACEPTADO'
                 || f.aeat_estado === 'PARCIAL';
         });
-        if (protegida) {
-            return res.status(403).json({ error: 'FACTURA YA ENVIADA A CLIENTE, POR FAVOR, EMITA ABONO DE ESTA FACTURA Y REFACTURAR EN UNA NUEVA.' });
+        if (protegidas.length > 0) {
+            for (const f of protegidas) {
+                await db.execute({
+                    sql:  `UPDATE facturas SET eliminacion_pendiente=1 WHERE id=?`,
+                    args: [f.id]
+                });
+            }
+            await registrarLog(usuario.username, 'Solicitar eliminación OT', `OT ID: ${id}`, { id, facturas: protegidas.map(f => f.id) }, 'PENDIENTE');
+            return res.status(202).json({ mensaje: 'FACTURA YA ENVIADA A CLIENTE. Solicitud de eliminación enviada, pendiente de autorización por un administrador.' });
         }
 
         await db.execute({ sql: `DELETE FROM facturas        WHERE ot_id = ?`, args: [id] });

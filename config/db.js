@@ -137,7 +137,9 @@ async function inicializarDB() {
             `ALTER TABLE facturas ADD COLUMN es_rectificativa INTEGER DEFAULT 0`,
             `ALTER TABLE facturas ADD COLUMN factura_rectificada_id INTEGER`,
             `ALTER TABLE facturas ADD COLUMN motivo_rectificacion TEXT`,
-            `ALTER TABLE facturas ADD COLUMN rectificada_por_id INTEGER`
+            `ALTER TABLE facturas ADD COLUMN rectificada_por_id INTEGER`,
+            // Solicitud de eliminación pendiente de aprobación admin (para facturas protegidas)
+            `ALTER TABLE facturas ADD COLUMN eliminacion_pendiente INTEGER DEFAULT 0`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }

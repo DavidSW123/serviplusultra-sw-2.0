@@ -14,6 +14,7 @@ const iaController        = require('../controllers/iaController');
 const logController            = require('../controllers/logController');
 const contabilidadController    = require('../controllers/contabilidadController');
 const presupuestosController    = require('../controllers/presupuestosController');
+const adminFacturasController   = require('../controllers/adminFacturasController');
 
 // ============================================================
 // USUARIOS
@@ -61,6 +62,13 @@ router.get   ('/facturas/:id/aeat-estado',   autenticado, facturaController.esta
 router.post  ('/facturas/:id/rectificar',    soloAdmin,   facturaController.rectificar);
 router.get   ('/facturas/rectificativas',    autenticado, facturaController.listarRectificativas);
 router.get   ('/facturas/:id',               autenticado, facturaController.getFactura);
+
+// ============================================================
+// ADMIN: SOLICITUDES DE ELIMINACIÓN DE FACTURAS PROTEGIDAS
+// ============================================================
+router.get   ('/admin/facturas/pendientes-eliminacion',   soloAdmin, adminFacturasController.listarPendientes);
+router.post  ('/admin/facturas/:id/aprobar-eliminacion',  soloAdmin, adminFacturasController.aprobarEliminacion);
+router.post  ('/admin/facturas/:id/rechazar-eliminacion', soloAdmin, adminFacturasController.rechazarEliminacion);
 router.post  ('/enviar-factura',             autenticado, facturaController.enviarEmail);
 router.post  ('/test-email',                 autenticado, facturaController.testEmail);
 
