@@ -314,7 +314,7 @@
                     clearInterval(timer);
                     abrirGeneradorFactura(id);
                     // Limpiar la URL (que no se repita la apertura al refrescar)
-                    history.replaceState(null, '', '/');
+                    history.replaceState(null, '', '/facturas');
                 } else if (intentos > 30) {
                     clearInterval(timer);
                 }
