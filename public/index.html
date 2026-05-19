@@ -306,18 +306,19 @@
             const params = new URLSearchParams(window.location.search);
             const id = parseInt(params.get('openFactura'));
             if (!id) return;
-            // Esperar a que cargarOTs haya poblado otsGlobal y abrir el modal
             let intentos = 0;
             const timer = setInterval(() => {
                 intentos++;
-                if (Array.isArray(window.otsGlobal) && otsGlobal.find(o => o.id === id)) {
-                    clearInterval(timer);
-                    abrirGeneradorFactura(id);
-                    // Limpiar la URL (que no se repita la apertura al refrescar)
-                    history.replaceState(null, '', '/facturas');
-                } else if (intentos > 30) {
-                    clearInterval(timer);
-                }
+                // otsGlobal es variable global (script clásico, no en window pero accesible directo)
+                try {
+                    if (typeof otsGlobal !== 'undefined' && Array.isArray(otsGlobal) && otsGlobal.find(o => o.id === id)) {
+                        clearInterval(timer);
+                        abrirGeneradorFactura(id);
+                        history.replaceState(null, '', '/facturas');
+                        return;
+                    }
+                } catch (_) {}
+                if (intentos > 50) clearInterval(timer);
             }, 200);
         })();
     </script>
