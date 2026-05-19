@@ -401,7 +401,7 @@ function verHistorialEnvios() {
     const cont = document.getElementById('tbodyHistorialEnvios');
     if (!cont) return;
     if (arr.length === 0) {
-        cont.innerHTML = '<tr><td colspan="2" style="text-align:center;color:#888;">Sin envíos registrados</td></tr>';
+        cont.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888;">Sin envíos registrados</td></tr>';
     } else {
         cont.innerHTML = arr.map((e, i) =>
             `<tr><td>${i + 1}</td><td>${e.email || '-'}</td><td>${e.fecha || '-'}</td></tr>`

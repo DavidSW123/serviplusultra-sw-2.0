@@ -19,6 +19,7 @@ const presupuestosController    = require('../controllers/presupuestosController
 // USUARIOS
 // ============================================================
 router.post  ('/login',               usuariosController.login);
+router.post  ('/recuperar-password',  usuariosController.recuperarPassword);
 router.put   ('/usuarios/foto',       autenticado, usuariosController.actualizarFoto);
 router.put   ('/usuarios/password',   autenticado, usuariosController.cambiarPassword);
 router.post  ('/usuarios/tecnico',    adminODirector, usuariosController.crearTecnico);

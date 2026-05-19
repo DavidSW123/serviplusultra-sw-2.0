@@ -5,6 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acceso - Facturas Plus Ultra</title>
     <link rel="stylesheet" href="/css/login.css">
+    <style>
+        .pass-wrap { position: relative; }
+        .pass-toggle {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; cursor: pointer; font-size: 1.2em;
+            color: #7f8c8d; padding: 4px 8px;
+        }
+        .pass-toggle:hover { color: #2c3e50; }
+        .forgot-link {
+            display: block; text-align: right; margin-top: -8px; margin-bottom: 12px;
+            font-size: 0.85em; color: #3498db; cursor: pointer; text-decoration: none;
+        }
+        .forgot-link:hover { text-decoration: underline; }
+
+        /* Modal recuperar */
+        .modal-bg {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.55); z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal-bg.show { display: flex; }
+        .modal-card {
+            background: #fff; padding: 30px; border-radius: 12px; max-width: 420px; width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+        }
+        .modal-card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .modal-card p { color: #7f8c8d; font-size: 0.9em; margin-bottom: 15px; }
+        .modal-card input {
+            width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;
+            margin-bottom: 12px; box-sizing: border-box;
+        }
+        .modal-acciones { display: flex; gap: 10px; justify-content: flex-end; }
+        .modal-acciones button {
+            padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 0.9em;
+        }
+        .btn-cancel { background: #ecf0f1; color: #2c3e50; }
+        .btn-enviar { background: #3498db; color: #fff; }
+        .btn-enviar:hover { background: #2980b9; }
+        .msg-ok  { background: #eafaf1; color: #1e8449; padding: 10px; border-radius: 6px; margin-bottom: 12px; }
+        .msg-err { background: #fdedec; color: #c0392b; padding: 10px; border-radius: 6px; margin-bottom: 12px; }
+    </style>
 </head>
 <body>
 
@@ -13,9 +54,27 @@
         <div id="errorBox" class="error-msg">Credenciales incorrectas</div>
         <form id="formLogin">
             <input type="text" id="user" placeholder="Usuario" required>
-            <input type="password" id="pass" placeholder="Contraseña" required>
+            <div class="pass-wrap">
+                <input type="password" id="pass" placeholder="Contraseña" required>
+                <button type="button" class="pass-toggle" id="togglePass" title="Mostrar/ocultar contraseña">👁️</button>
+            </div>
+            <a class="forgot-link" onclick="abrirRecuperar()">¿Olvidaste tu contraseña?</a>
             <button type="submit">Entrar</button>
         </form>
+    </div>
+
+    <!-- Modal recuperar contraseña -->
+    <div class="modal-bg" id="modalRecuperar">
+        <div class="modal-card">
+            <h2>🔑 Recuperar contraseña</h2>
+            <p>Introduce el nombre de usuario. Se enviará una contraseña temporal al correo de la empresa (<strong>serviplusultrasolutionssl@gmail.com</strong>).</p>
+            <div id="msgRecuperar"></div>
+            <input type="text" id="recuperarUser" placeholder="Usuario">
+            <div class="modal-acciones">
+                <button class="btn-cancel" onclick="cerrarRecuperar()">Cancelar</button>
+                <button class="btn-enviar" id="btnEnviarRecuperar" onclick="enviarRecuperar()">Enviar al correo</button>
+            </div>
+        </div>
     </div>
 
     <script src="/js/login.js"></script>
