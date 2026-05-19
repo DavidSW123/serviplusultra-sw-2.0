@@ -67,7 +67,7 @@ function dibujarTabla(datos) {
 
         tbody.innerHTML += `<tr>
             <td>${ot.id}</td>
-            <td><strong>${ot.codigo_ot}</strong></td>
+            <td><a href="/?openFactura=${ot.id}" style="color:#1abc9c; font-weight:bold; text-decoration:none; cursor:pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir vista de factura de esta OT">${ot.codigo_ot}</a></td>
             <td>${nombreCliente}</td>
             <td>${ot.marca}</td>
             <td>${fechaLimpia}</td>
