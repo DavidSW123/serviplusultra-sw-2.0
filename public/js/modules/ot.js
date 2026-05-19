@@ -18,9 +18,12 @@ function cargarOTs() {
             const sT      = ot.tecnicos_nombres ? `<br><small style="color:#3498db; font-weight:bold;">👷 ${ot.tecnicos_nombres}</small>` : '';
             const clsEst  = ot.estado === 'HECHO' ? 'est-hecho' : (ot.estado === 'ANULADO' ? 'est-anulado' : 'est-pendiente');
 
+            const sFact = ot.numero_factura
+                ? `<br><small style="color:#1abc9c; font-weight:bold;">📄 Factura: ${ot.numero_factura}</small>`
+                : '';
             cont.innerHTML += `<div class="ot-card">
                 <div class="ot-info">
-                    <strong>${ot.codigo_ot}</strong> - ${ot.marca} ${sC} ${sT}
+                    <strong>${ot.codigo_ot}</strong> - ${ot.marca} ${sC} ${sT} ${sFact}
                     <br><strong style="color:#e67e22;">Materiales/Tickets: ${ot.materiales_precio.toFixed(2)} €</strong>
                 </div>
                 <div class="actions">
