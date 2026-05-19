@@ -125,17 +125,15 @@ async function abrirGeneradorFactura(id) {
     window._modoRefactura = false;
 
     if (ot.factura_rectificada_por_id) {
-        // Factura rectificada (anulada) → modo solo lectura.
-        // Refacturar es OPCIONAL, no obligatorio (puede ser solo abono).
         if (btnRect)    btnRect.style.display = 'none';
         if (btnGuardar) btnGuardar.style.display = 'none';
         if (btnEmail)   btnEmail.style.display = 'none';
 
-        const fNum = document.getElementById('factNumero');
-        if (fNum) {
+        const wrap = document.getElementById('factBadgesWrap');
+        if (wrap) {
             const rectId = ot.factura_rectificada_por_id;
-            fNum.insertAdjacentHTML('afterend',
-                ` <span id="tagRectificada" class="no-print" onclick="verRectificativa(${rectId})" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px; cursor:pointer;" title="Click para ver la rectificativa">📝 Rectificada por ${ot.factura_rectificativa_numero || ''} →</span>`);
+            wrap.insertAdjacentHTML('beforeend',
+                `<span id="tagRectificada" class="fact-pill fact-pill-orange" onclick="verRectificativa(${rectId})" title="Click para ver la rectificativa">📝 Rectificada por ${ot.factura_rectificativa_numero || ''} →</span>`);
         }
         const factHeader = document.querySelector('.datos-factura');
         if (factHeader) {
@@ -155,15 +153,13 @@ async function abrirGeneradorFactura(id) {
         }
     } else {
 
-        // Si esta factura es una refactura (existe factura anterior rectificada en la misma OT),
-        // mostrar el historial como badge clickable.
         const prevHist = document.getElementById('tagHistorial');
         if (prevHist) prevHist.remove();
         if (ot.factura_anterior_id) {
-            const fNum = document.getElementById('factNumero');
-            if (fNum) {
-                fNum.insertAdjacentHTML('afterend',
-                    ` <span id="tagHistorial" class="no-print" onclick="abrirFacturaAnterior(${ot.factura_anterior_id})" style="background:#3498db; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px; cursor:pointer;" title="Click para ver la factura anterior rectificada">📜 Refactura de ${ot.factura_anterior_numero}${ot.factura_anterior_rectificativa ? ' (rect. ' + ot.factura_anterior_rectificativa + ')' : ''} →</span>`);
+            const wrap = document.getElementById('factBadgesWrap');
+            if (wrap) {
+                wrap.insertAdjacentHTML('beforeend',
+                    `<span id="tagHistorial" class="fact-pill fact-pill-blue" onclick="abrirFacturaAnterior(${ot.factura_anterior_id})" title="Click para ver la factura anterior rectificada">📜 Refactura de ${ot.factura_anterior_numero}${ot.factura_anterior_rectificativa ? ' (rect. ' + ot.factura_anterior_rectificativa + ')' : ''} →</span>`);
             }
         }
     }
@@ -171,34 +167,30 @@ async function abrirGeneradorFactura(id) {
 }
 
 function _renderBadgePendienteElim(pendiente) {
-    // Quitar badge previo
     const prev = document.getElementById('badgePendienteElim');
     if (prev) prev.remove();
     if (!pendiente) return;
-    const fNum = document.getElementById('factNumero');
-    if (!fNum) return;
-    fNum.insertAdjacentHTML('afterend',
-        ` <span id="badgePendienteElim" class="no-print" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px;" title="Esta factura tiene una solicitud de eliminación pendiente de admin">⚠️ Pendiente eliminación</span>`);
+    const wrap = document.getElementById('factBadgesWrap');
+    if (!wrap) return;
+    wrap.insertAdjacentHTML('beforeend',
+        `<span id="badgePendienteElim" class="fact-pill fact-pill-orange fact-pill-static" title="Esta factura tiene una solicitud de eliminación pendiente de admin">⚠️ Pendiente eliminación</span>`);
 }
 
 function _renderBadgeAEAT(estado, error) {
     const badge = document.getElementById('badgeAEAT');
     if (!badge) return;
-    // Si está desactivado (VeriFactu off hasta 2027), no mostramos badge
     if (!estado || estado === 'DESACTIVADO' || estado === 'PENDIENTE') { badge.style.display = 'none'; return; }
-    const colors = {
-        ACEPTADO:  { bg:'#27ae60', txt:'✓ AEAT Aceptada' },
-        PARCIAL:   { bg:'#f39c12', txt:'⚠ AEAT Parcial' },
-        PENDIENTE: { bg:'#95a5a6', txt:'⏳ AEAT Pendiente' },
-        RECHAZADO: { bg:'#e74c3c', txt:'✗ AEAT Rechazada' },
-        ERROR:     { bg:'#c0392b', txt:'⚠ AEAT Error' }
+    const classMap = {
+        ACEPTADO:  { cls:'fact-pill-green',  txt:'✓ AEAT Aceptada' },
+        PARCIAL:   { cls:'fact-pill-yellow', txt:'⚠ AEAT Parcial' },
+        RECHAZADO: { cls:'fact-pill-red',    txt:'✗ AEAT Rechazada' },
+        ERROR:     { cls:'fact-pill-red',    txt:'⚠ AEAT Error' }
     };
-    const c = colors[estado] || { bg:'#7f8c8d', txt: 'AEAT ' + estado };
-    badge.style.background = c.bg;
-    badge.style.color = '#fff';
+    const c = classMap[estado] || { cls:'fact-pill-grey', txt: 'AEAT ' + estado };
+    badge.className = 'fact-pill ' + c.cls;
     badge.innerText = c.txt;
     badge.title = error || `Estado AEAT: ${estado}`;
-    badge.style.display = 'inline-block';
+    badge.style.display = 'inline-flex';
 }
 
 async function verEstadoAEAT() {
@@ -412,10 +404,10 @@ async function verRectificativa(facturaId) {
     // Limpiar tag previa y añadir aviso de "es rectificativa de XX"
     const prevTag = document.getElementById('tagRectificada');
     if (prevTag) prevTag.remove();
-    const fNum = document.getElementById('factNumero');
-    if (fNum) {
-        fNum.insertAdjacentHTML('afterend',
-            ` <span id="tagRectificada" class="no-print" style="background:#e67e22; color:#fff; padding:3px 10px; border-radius:12px; font-size:0.8em; margin-left:6px;" title="${(f.motivo_rectificacion || '').replace(/"/g,'&quot;')}">📝 Rectificativa de ${f.rectifica_a_numero || ''}</span>`);
+    const wrap = document.getElementById('factBadgesWrap');
+    if (wrap) {
+        wrap.insertAdjacentHTML('beforeend',
+            `<span id="tagRectificada" class="fact-pill fact-pill-orange fact-pill-static" title="${(f.motivo_rectificacion || '').replace(/"/g,'&quot;')}">📝 Rectificativa de ${f.rectifica_a_numero || ''}</span>`);
     }
 
     // Ocultar botón "Emitir Rectificativa" (no se puede rectificar una rectificativa)
@@ -477,7 +469,8 @@ function _renderBadgeEnviada(emailsJson) {
         badge.style.display = 'none';
         return;
     }
-    badge.style.display = 'inline-block';
+    badge.style.display = 'inline-flex';
+    badge.className = 'fact-pill fact-pill-green';
     badge.innerText = `📧 Enviada ${arr.length} ${arr.length === 1 ? 'vez' : 'veces'}`;
 }
 

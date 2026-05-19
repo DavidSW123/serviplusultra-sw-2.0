@@ -106,3 +106,30 @@
     .btn-save, .btn-factura, .btn-ticket, .btn-secundario { font-size: 15px; }
     .bubble-img { width: 60px; height: 60px; }
 }
+
+/* ── BADGES DEL MODAL DE FACTURA ─────────────────────────── */
+.fact-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 0.78em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+    border: none;
+    line-height: 1.2;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.fact-pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.15); filter: brightness(1.05); }
+.fact-pill-green   { background: #27ae60; color: #fff; }
+.fact-pill-blue    { background: #3498db; color: #fff; }
+.fact-pill-orange  { background: #e67e22; color: #fff; }
+.fact-pill-red     { background: #e74c3c; color: #fff; }
+.fact-pill-yellow  { background: #f1c40f; color: #5a4500; }
+.fact-pill-grey    { background: #95a5a6; color: #fff; }
+.fact-pill-purple  { background: #9b59b6; color: #fff; }
+.fact-pill-static  { cursor: default; }
+.fact-pill-static:hover { transform: none; box-shadow: 0 1px 3px rgba(0,0,0,0.08); filter: none; }
