@@ -576,68 +576,8 @@ async function guardarCambiosFactura() {
         }
         const numFact = document.getElementById('factNumero').innerText;
         alert(`✅ Cambios guardados (${numFact})`);
-
-        // Si es factura regular sin enviar, ofrecer reasignar al hueco más bajo
-        if (!window._modoRectificativa && window._facturaActualId) {
-            await _ofrecerReasignarHueco();
-        }
     } catch (e) {
         alert('❌ Error al guardar: ' + e.message);
-    }
-}
-
-/** Comprueba si hay hueco libre por debajo y, si lo hay, pregunta al usuario para renumerar. */
-async function _ofrecerReasignarHueco() {
-    try {
-        const id = window._facturaActualId;
-        if (!id) return;
-        // Comprobar condiciones desde otsGlobal
-        const ot = otsGlobal.find(o => o.factura_id === id);
-        if (!ot) return;
-        // No ofrecer si ya tiene envíos registrados
-        let envios = [];
-        try { envios = JSON.parse(ot.factura_emails_enviados || '[]'); } catch (_) {}
-        if (Array.isArray(envios) && envios.length > 0) return;
-        // No ofrecer si el badge de "Enviada" se está mostrando
-        const badgeEnv = document.getElementById('badgeFactEnviada');
-        if (badgeEnv && badgeEnv.style.display !== 'none') return;
-
-        // Detectar hueco abajo: extraemos secuencias de todas las facturas regulares del año
-        const año = new Date().getFullYear();
-        const seqActual = parseInt((ot.numero_factura || '').split('-')[0]);
-        if (!seqActual) return;
-        const seqs = otsGlobal
-            .filter(o => o.numero_factura && !o.numero_factura.startsWith('R-'))
-            .map(o => {
-                const m = o.numero_factura.match(/^(\d+)-(\d{4})/);
-                return m && m[2] === String(año) ? parseInt(m[1]) : null;
-            })
-            .filter(n => n !== null);
-        const usados = new Set(seqs);
-        let candidato = 1;
-        while (usados.has(candidato)) candidato++;
-        if (candidato >= seqActual) return; // No hay hueco por debajo
-
-        const conf = confirm(
-            `Hay un hueco libre en la serie de facturas: nº ${String(candidato).padStart(2,'0')}.\n\n` +
-            `Esta factura todavía no se ha enviado al cliente, por lo que se puede renumerar para mantener la correlación sin huecos (RD 1619/2012).\n\n` +
-            `¿Renumerar esta factura de ${ot.numero_factura} a ${String(candidato).padStart(2,'0')}-...?`
-        );
-        if (!conf) return;
-
-        const r = await API.post(`/api/facturas/${id}/reasignar-numero`, {});
-        if (r.error) { alert('❌ ' + r.error); return; }
-        if (r.sinCambio) { alert('ℹ️ ' + r.mensaje); return; }
-
-        alert(`✅ Renumerada: ${r.numero_anterior} → ${r.numero_nuevo}`);
-
-        // Refrescar otsGlobal y la UI del modal
-        const frescas = await API.get('/api/ot');
-        if (Array.isArray(frescas)) otsGlobal = frescas;
-        document.getElementById('factNumero').innerText = r.numero_nuevo;
-        _renderQRFactura(r.qr_data);
-    } catch (e) {
-        console.error('Error al ofrecer reasignar hueco:', e);
     }
 }
 
