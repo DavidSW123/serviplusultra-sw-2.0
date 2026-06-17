@@ -59,6 +59,21 @@ app.get('/presupuestos',  (_req, res) => res.sendFile(path.join(__dirname, 'publ
 app.get('/bbdd',          (_req, res) => res.sendFile(path.join(__dirname, 'public', 'bbdd.html')));
 app.get('/login',         (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
+// ── 404 para API no encontrada ─────────────────────────────────
+app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint no encontrado.' }));
+
+// ── Manejador central de errores (nunca filtra el detalle al cliente) ──
+app.use((err, req, res, _next) => {
+    const ref = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    console.error(`[ERROR][${ref}] ${req.method} ${req.originalUrl}:`, (err && err.stack) ? err.stack : err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: `Error interno del servidor. Ref: ${ref}` });
+});
+
+// ── Red de seguridad a nivel de proceso ────────────────────────
+process.on('unhandledRejection', (motivo) => console.error('[unhandledRejection]', motivo));
+process.on('uncaughtException',  (err)    => console.error('[uncaughtException]', err && err.stack ? err.stack : err));
+
 // ── Arranque ───────────────────────────────────────────────────
 inicializarDB().then(() => {
     app.listen(PORT, () => console.log(`🚀 ServiPlusUltra V2 listo en el puerto ${PORT}`));

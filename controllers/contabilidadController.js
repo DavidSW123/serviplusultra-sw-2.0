@@ -1,5 +1,6 @@
 const { db } = require('../config/db');
 
+const { errorServidor } = require('../utils/responder');
 /**
  * GET /api/contabilidad/resumen
  * Agrega datos financieros de todas las tablas.
@@ -160,7 +161,7 @@ async function getResumen(req, res) {
             gastos_lista:           rGastosLista.rows,
         });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 

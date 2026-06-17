@@ -142,12 +142,16 @@ async function inicializarDB() {
         // --- SEED: usuario admin por defecto si la tabla está vacía ---
         const { rows } = await db.execute("SELECT count(*) as count FROM usuarios");
         if (rows[0].count === 0) {
-            await db.execute(`
-                INSERT INTO usuarios (username, password, rol)
-                VALUES ('Giancarlo', 'gian123', 'admin'),
-                       ('David',     'dav123',  'admin'),
-                       ('Kevin',     'kev123',  'director')
-            `);
+            const bcrypt = require('bcryptjs');
+            const seed = [
+                ['Giancarlo', 'gian123', 'admin'],
+                ['David',     'dav123',  'admin'],
+                ['Kevin',     'kev123',  'director']
+            ];
+            for (const [u, p, r] of seed) {
+                const hash = await bcrypt.hash(p, 12);
+                await db.execute({ sql: `INSERT INTO usuarios (username, password, rol) VALUES (?, ?, ?)`, args: [u, hash, r] });
+            }
         }
 
         console.log('✅ Base de datos Turso conectada y operativa.');

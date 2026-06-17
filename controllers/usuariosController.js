@@ -1,6 +1,12 @@
 const { db } = require('../config/db');
+const { errorServidor } = require('../utils/responder');
 const jwt    = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { JWT_SECRET } = require('../config/env');
+
+const BCRYPT_ROUNDS = 12;
+/** ¿El valor guardado ya es un hash bcrypt? */
+function esHash(v) { return typeof v === 'string' && v.startsWith('$2'); }
 
 const DURACION_SESION = 7 * 24 * 60 * 60; // 7 días en segundos
 
@@ -24,15 +30,31 @@ async function login(req, res) {
     try {
         const { username, password } = req.body;
         const result = await db.execute({
-            sql:  `SELECT username, rol, foto FROM usuarios WHERE username = ? AND password = ?`,
-            args: [username, password]
+            sql:  `SELECT id, username, rol, foto, password FROM usuarios WHERE username = ?`,
+            args: [username]
         });
 
         if (result.rows.length === 0) {
             return res.status(401).json({ error: 'Credenciales incorrectas' });
         }
 
-        const usuario = result.rows[0];
+        const usuario  = result.rows[0];
+        const guardada = usuario.password || '';
+
+        // Verificación con migración perezosa: si la contraseña aún está en texto
+        // plano, se compara directamente y se re-hashea para la próxima vez.
+        let ok;
+        if (esHash(guardada)) {
+            ok = await bcrypt.compare(password, guardada);
+        } else {
+            ok = (password === guardada);
+            if (ok) {
+                const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+                await db.execute({ sql: `UPDATE usuarios SET password=? WHERE id=?`, args: [hash, usuario.id] });
+            }
+        }
+        if (!ok) return res.status(401).json({ error: 'Credenciales incorrectas' });
+
         const token = jwt.sign(
             { username: usuario.username, rol: usuario.rol },
             JWT_SECRET,
@@ -47,7 +69,7 @@ async function login(req, res) {
             foto:     usuario.foto
         });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -75,7 +97,7 @@ async function actualizarFoto(req, res) {
         });
         res.json({ mensaje: 'Foto actualizada' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -87,21 +109,27 @@ async function cambiarPassword(req, res) {
     try {
         const { username, oldPass, newPass } = req.body;
         const check = await db.execute({
-            sql:  `SELECT id FROM usuarios WHERE username = ? AND password = ?`,
-            args: [username, oldPass]
+            sql:  `SELECT id, password FROM usuarios WHERE username = ?`,
+            args: [username]
         });
 
         if (check.rows.length === 0) {
             return res.status(400).json({ error: 'Clave actual incorrecta' });
         }
+        const guardada = check.rows[0].password || '';
+        const ok = esHash(guardada) ? await bcrypt.compare(oldPass, guardada) : (oldPass === guardada);
+        if (!ok) {
+            return res.status(400).json({ error: 'Clave actual incorrecta' });
+        }
 
+        const hash = await bcrypt.hash(newPass, BCRYPT_ROUNDS);
         await db.execute({
             sql:  `UPDATE usuarios SET password = ? WHERE username = ?`,
-            args: [newPass, username]
+            args: [hash, username]
         });
         res.json({ mensaje: 'Contraseña cambiada' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -113,9 +141,10 @@ async function cambiarPassword(req, res) {
 async function crearTecnico(req, res) {
     try {
         const { username, password } = req.body;
+        const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
         await db.execute({
             sql:  `INSERT INTO usuarios (username, password, rol) VALUES (?, ?, 'tecnico')`,
-            args: [username, password]
+            args: [username, hash]
         });
         res.json({ mensaje: 'Técnico creado' });
     } catch (e) {
@@ -135,7 +164,7 @@ async function getNombres(req, res) {
         );
         res.json(result.rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -166,10 +195,11 @@ async function recuperarPassword(req, res) {
         let tempPass = '';
         for (let i = 0; i < 12; i++) tempPass += chars[Math.floor(Math.random() * chars.length)];
 
-        // Actualizar BBDD
+        // Actualizar BBDD (se guarda hasheada; el email lleva la temporal en claro)
+        const hashTemp = await bcrypt.hash(tempPass, BCRYPT_ROUNDS);
         await db.execute({
             sql:  `UPDATE usuarios SET password = ? WHERE username = ?`,
-            args: [tempPass, username.trim()]
+            args: [hashTemp, username.trim()]
         });
 
         // Enviar email al correo corporativo
@@ -213,7 +243,7 @@ async function recuperarPassword(req, res) {
 
         res.json({ ok: true, mensaje: 'Contraseña temporal enviada al correo de la empresa.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 

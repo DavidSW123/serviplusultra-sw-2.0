@@ -1,4 +1,5 @@
 const { db }           = require('../config/db');
+const { errorServidor } = require('../utils/responder');
 const { validarOT }    = require('../utils/validaciones');
 const { registrarLog } = require('../utils/registrarLog');
 
@@ -65,7 +66,7 @@ async function getAll(req, res) {
         );
         res.json(result.rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -125,7 +126,7 @@ async function crear(req, res) {
         if (e.message?.includes('UNIQUE')) {
             res.status(400).json({ error: 'Ese código de OT ya está registrado.' });
         } else {
-            res.status(500).json({ error: e.message });
+            errorServidor(res, e);
         }
     }
 }
@@ -170,7 +171,7 @@ async function editar(req, res) {
         if (e.message?.includes('UNIQUE')) {
             res.status(400).json({ error: 'Ese código de OT ya está registrado.' });
         } else {
-            res.status(500).json({ error: e.message });
+            errorServidor(res, e);
         }
     }
 }
@@ -213,7 +214,7 @@ async function cambiarEstado(req, res) {
         );
         res.json({ mensaje: 'Estado actualizado.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -263,7 +264,7 @@ async function eliminar(req, res) {
         await registrarLog(usuario.username, 'Eliminar OT', `OT: ${id} eliminada`, { id }, 'APROBADO');
         res.json({ mensaje: 'OT eliminada.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -278,7 +279,7 @@ async function getAdjuntos(req, res) {
         });
         res.json(result.rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -308,7 +309,7 @@ async function addAdjunto(req, res) {
         }
         res.json({ mensaje: 'Ticket guardado y sumado.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -333,7 +334,7 @@ async function addLineasMateriales(req, res) {
         }
         res.json({ mensaje: 'Nuevas líneas añadidas.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -361,7 +362,7 @@ async function deleteAdjunto(req, res) {
 
         res.json({ mensaje: 'Línea/Ticket eliminado.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 

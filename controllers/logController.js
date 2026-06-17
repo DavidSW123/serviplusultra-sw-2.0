@@ -1,4 +1,5 @@
 const { db } = require('../config/db');
+const { errorServidor } = require('../utils/responder');
 const { validarOT } = require('../utils/validaciones');
 
 /**
@@ -11,7 +12,7 @@ async function getAll(req, res) {
         const result = await db.execute(`SELECT * FROM logs ORDER BY id DESC`);
         res.json(result.rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -35,7 +36,7 @@ async function editar(req, res) {
         });
         res.json({ mensaje: 'Petición actualizada.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -124,7 +125,7 @@ async function resolver(req, res) {
         res.json({ mensaje: 'Petición ejecutada y aprobada.' });
 
     } catch (e) {
-        res.status(500).json({ error: `Error resolviendo petición: ${e.message}` });
+        errorServidor(res, e, 'resolverLog');
     }
 }
 
