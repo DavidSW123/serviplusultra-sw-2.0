@@ -89,7 +89,7 @@ function dibujarTabla(datos) {
             <td>${escapeHTML(tecnicos)}</td>
             <td>${ot.materiales_precio} €</td>
             <td><span class="badge" style="background-color:${colorEstado}; color:${colorTexto};">${escapeHTML(ot.estado)}</span></td>
-            <td style="color:${ot.numero_factura ? '#1abc9c' : '#ccc'}; font-weight:${ot.numero_factura ? 'bold' : 'normal'};">${escapeHTML(ot.numero_factura) || '—'}</td>
+            <td style="color:${ot.numero_factura ? '#1abc9c' : '#ccc'}; font-weight:${ot.numero_factura ? 'bold' : 'normal'};">${escapeHTML(ot.numero_factura) || '—'}${ot.factura_anterior_numero ? `<br><small style="color:#e67e22; font-weight:normal;" title="Factura rectificada (anulada)">↩ ${escapeHTML(ot.factura_anterior_numero)} rectif.${ot.factura_anterior_rectificativa ? ' (' + escapeHTML(ot.factura_anterior_rectificativa) + ')' : ''}</small>` : ''}</td>
             ${celdaAcciones}
         </tr>`;
     });
