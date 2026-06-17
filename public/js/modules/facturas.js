@@ -114,20 +114,25 @@ async function abrirGeneradorFactura(id) {
     const btnGuardar = document.querySelector('#modalFactura [onclick="guardarCambiosFactura()"]');
     const btnEmail   = document.querySelector('#modalFactura [onclick="enviarFacturaAlCliente()"]');
     const btnPDF     = document.querySelector('#modalFactura [onclick="descargarFacturaPDF()"]');
-    if (btnGuardar) { btnGuardar.innerText = '💾 Guardar Cambios'; btnGuardar.style.display = ''; }
+    if (btnGuardar) { btnGuardar.innerText = '💾 Guardar Cambios'; btnGuardar.style.display = ''; btnGuardar.style.backgroundColor = ''; btnGuardar.style.color = ''; }
     if (btnEmail)   btnEmail.style.display = '';
     if (btnPDF)     btnPDF.style.display = '';
     if (btnRect)    btnRect.style.display = '';
     const avisoPrev = document.getElementById('avisoRefactura');
     if (avisoPrev) avisoPrev.remove();
-    const btnRefacPrev = document.getElementById('btnRefacturar');
-    if (btnRefacPrev) btnRefacPrev.remove();
     window._modoRefactura = false;
 
     if (ot.factura_rectificada_por_id) {
-        if (btnRect)    btnRect.style.display = 'none';
-        if (btnGuardar) btnGuardar.style.display = 'none';
-        if (btnEmail)   btnEmail.style.display = 'none';
+        // Factura anulada por su rectificativa. Reutilizamos el botón principal como "Emitir Refactura".
+        if (btnRect)  btnRect.style.display = 'none';
+        if (btnEmail) btnEmail.style.display = 'none';
+        if (btnGuardar) {
+            btnGuardar.style.display = '';
+            btnGuardar.innerText = '📄 Emitir Refactura';
+            btnGuardar.style.backgroundColor = '#3498db';
+            btnGuardar.style.color = '#fff';
+        }
+        window._modoRefactura = true;
 
         const wrap = document.getElementById('factBadgesWrap');
         if (wrap) {
@@ -138,18 +143,7 @@ async function abrirGeneradorFactura(id) {
         const factHeader = document.querySelector('.datos-factura');
         if (factHeader) {
             factHeader.insertAdjacentHTML('beforeend',
-                `<div id="avisoRefactura" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">Esta factura está <strong>anulada</strong> por la rectificativa. Si la anulación es solo un abono, no necesita más acción. Si necesitas emitir una nueva factura, pulsa <em>Emitir Refactura</em>.</div>`);
-        }
-        // Inyectar botón refactura como opción explícita (al final de la botonera)
-        const botoneraFactura = document.querySelector('#modalFactura .no-print > button')?.parentNode;
-        if (botoneraFactura && !document.getElementById('btnRefacturar')) {
-            const btn = document.createElement('button');
-            btn.id = 'btnRefacturar';
-            btn.className = 'btn-secundario';
-            btn.style.cssText = 'flex-grow:1; padding:14px; font-size:15px; background-color:#3498db; color:#fff;';
-            btn.innerText = '📄 Emitir Refactura';
-            btn.onclick = () => { window._modoRefactura = true; guardarCambiosFactura(); };
-            botoneraFactura.appendChild(btn);
+                `<div id="avisoRefactura" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">Esta factura está <strong>anulada</strong> por la rectificativa. Si la anulación es solo un abono, no necesita más acción. Si necesitas emitir una nueva factura, pulsa <em>📄 Emitir Refactura</em>.</div>`);
         }
     } else {
 
