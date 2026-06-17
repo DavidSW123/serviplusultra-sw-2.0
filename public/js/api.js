@@ -11,6 +11,17 @@ const prefijoAnoActual = `OT${new Date().getFullYear().toString().slice(-2)}/`;
 // Solo queda el Content-Type; el rol/usuario ya NO se mandan por cabecera.
 const headersSeguridad = { 'Content-Type': 'application/json' };
 
+// Escapa texto del usuario antes de meterlo en innerHTML (previene XSS).
+function escapeHTML(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // Estado compartido entre módulos
 let otsGlobal      = [];
 let logsGlobal     = [];

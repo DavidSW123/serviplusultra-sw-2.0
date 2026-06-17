@@ -3,6 +3,17 @@ if (!sesionStr) window.location.href = '/login';
 const sesion = JSON.parse(sesionStr);
 // La sesión viaja en cookie httpOnly (se envía sola en mismo origen). Solo Content-Type.
 const headersSeguridad = { 'Content-Type': 'application/json' };
+
+// Escapa texto del usuario antes de meterlo en innerHTML (previene XSS).
+function escapeHTML(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 const prefijoAnoActual = `OT${new Date().getFullYear().toString().slice(-2)}/`;
 
 document.getElementById('infoUsuarioBBDD').innerHTML = `👤 <strong>${sesion.username.toUpperCase()}</strong> (${sesion.rol})`;
@@ -69,16 +80,16 @@ function dibujarTabla(datos) {
 
         tbody.innerHTML += `<tr>
             <td>${ot.id}</td>
-            <td><a href="/facturas?openFactura=${ot.id}" style="color:#1abc9c; font-weight:bold; text-decoration:none; cursor:pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir vista de factura de esta OT">${ot.codigo_ot}</a></td>
-            <td>${nombreCliente}</td>
-            <td>${ot.marca}</td>
-            <td>${fechaLimpia}</td>
-            <td>${ot.tipo_urgencia}</td>
+            <td><a href="/facturas?openFactura=${ot.id}" style="color:#1abc9c; font-weight:bold; text-decoration:none; cursor:pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir vista de factura de esta OT">${escapeHTML(ot.codigo_ot)}</a></td>
+            <td>${escapeHTML(nombreCliente)}</td>
+            <td>${escapeHTML(ot.marca)}</td>
+            <td>${escapeHTML(fechaLimpia)}</td>
+            <td>${escapeHTML(ot.tipo_urgencia)}</td>
             <td>${ot.horas}</td>
-            <td>${tecnicos}</td>
+            <td>${escapeHTML(tecnicos)}</td>
             <td>${ot.materiales_precio} €</td>
-            <td><span class="badge" style="background-color:${colorEstado}; color:${colorTexto};">${ot.estado}</span></td>
-            <td style="color:${ot.numero_factura ? '#1abc9c' : '#ccc'}; font-weight:${ot.numero_factura ? 'bold' : 'normal'};">${ot.numero_factura || '—'}</td>
+            <td><span class="badge" style="background-color:${colorEstado}; color:${colorTexto};">${escapeHTML(ot.estado)}</span></td>
+            <td style="color:${ot.numero_factura ? '#1abc9c' : '#ccc'}; font-weight:${ot.numero_factura ? 'bold' : 'normal'};">${escapeHTML(ot.numero_factura) || '—'}</td>
             ${celdaAcciones}
         </tr>`;
     });
