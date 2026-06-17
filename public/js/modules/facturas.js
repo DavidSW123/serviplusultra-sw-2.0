@@ -192,10 +192,28 @@ function abrirRectificar() {
     }
     document.getElementById('rectOrigNumero').innerText = numActual;
     document.getElementById('rectMotivo').value = '';
-    // Pre-cargar líneas de la factura original (copia editable)
-    lineasRect = lineasFactura.map(l => ({ concepto: l.concepto, cantidad: l.cantidad, precio: l.precio }));
-    _renderLineasRect();
+    // Guardar copia de las líneas originales para reconstruir según el tipo elegido
+    window._rectLineasOrig = lineasFactura.map(l => ({ concepto: l.concepto, cantidad: l.cantidad, precio: l.precio }));
+    document.getElementById('rectTipo').value = 'abono';
+    cambiarTipoRect();   // por defecto: abono (importes en negativo)
     abrirModal('modalRectificar');
+}
+
+/** Reconstruye las líneas de la rectificativa según el tipo (abono = negativo / manual). */
+function cambiarTipoRect() {
+    const tipo  = document.getElementById('rectTipo').value;
+    const orig  = window._rectLineasOrig || [];
+    const ayuda = document.getElementById('rectTipoAyuda');
+    if (tipo === 'abono') {
+        // Anulación: importes de la original en NEGATIVO
+        lineasRect = orig.map(l => ({ concepto: l.concepto, cantidad: l.cantidad, precio: -Math.abs(parseFloat(l.precio) || 0) }));
+        if (ayuda) ayuda.innerText = 'Un abono anula la factura original: refleja sus importes en negativo.';
+    } else {
+        // Manual: parte de la original; el usuario ajusta (negativos para abonar, positivos para cargos)
+        lineasRect = orig.map(l => ({ concepto: l.concepto, cantidad: l.cantidad, precio: parseFloat(l.precio) || 0 }));
+        if (ayuda) ayuda.innerText = 'Edita los importes a mano: negativos para abonar, positivos para cargos adicionales.';
+    }
+    _renderLineasRect();
 }
 
 function _renderLineasRect() {
