@@ -14,7 +14,7 @@ function cargarClientes() {
         if (selEdOt) selEdOt.innerHTML = '<option value="">-- Sin asignar / General --</option>';
 
         aprobados.forEach(c => {
-            const opt = `<option value="${c.id}">${c.nombre}</option>`;
+            const opt = `<option value="${c.id}">${escapeHTML(c.nombre)}</option>`;
             selOt.innerHTML   += opt;
             selFact.innerHTML += opt;
             if (selEdOt) selEdOt.innerHTML += opt;
@@ -32,8 +32,8 @@ function renderizarBurbujasClientes() {
     }
     aprobados.forEach(c => {
         grid.innerHTML += `<div class="cliente-bubble" onclick="abrirDetalleCliente(${c.id})">
-            <img src="${c.logo || imgClienteDef}" class="bubble-img">
-            <div class="bubble-name">${c.nombre}</div>
+            <img src="${escapeHTML(c.logo) || imgClienteDef}" class="bubble-img">
+            <div class="bubble-name">${escapeHTML(c.nombre)}</div>
         </div>`;
     });
 }
@@ -60,8 +60,8 @@ function abrirDetalleCliente(id) {
         ots.forEach(ot => {
             const color = ot.estado === 'HECHO' ? '#27ae60' : (ot.estado === 'PENDIENTE' ? '#f39c12' : '#e74c3c');
             divOts.innerHTML += `<div style="border-left:4px solid ${color}; padding:10px; background:#fff; margin-bottom:8px;">
-                <strong>${ot.codigo_ot}</strong> - ${ot.marca}
-                <span style="float:right; color:${color};">${ot.estado}</span>
+                <strong>${escapeHTML(ot.codigo_ot)}</strong> - ${escapeHTML(ot.marca)}
+                <span style="float:right; color:${color};">${escapeHTML(ot.estado)}</span>
             </div>`;
         });
     }
@@ -139,8 +139,8 @@ function abrirSolicitudesClientes() {
     } else {
         pend.forEach(c => {
             tbody.innerHTML += `<tr>
-                <td><strong>${c.nombre}</strong></td>
-                <td>${c.nif}</td>
+                <td><strong>${escapeHTML(c.nombre)}</strong></td>
+                <td>${escapeHTML(c.nif)}</td>
                 <td>Director</td>
                 <td>
                     <button style="background:#27ae60; border:none; color:white; padding:5px; cursor:pointer;" onclick="resolverCliente(${c.id},'APROBADO')">✅</button>

@@ -1,5 +1,6 @@
 const { db } = require('../config/db');
 
+const { errorServidor } = require('../utils/responder');
 /**
  * GET /api/clientes
  * Devuelve todos los clientes ordenados por nombre.
@@ -9,7 +10,7 @@ async function getAll(req, res) {
         const result = await db.execute(`SELECT * FROM clientes ORDER BY nombre ASC`);
         res.json(result.rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -55,7 +56,7 @@ async function cambiarEstado(req, res) {
         });
         res.json({ mensaje: `Cliente ${req.body.estado}` });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -74,7 +75,7 @@ async function editar(req, res) {
         });
         res.json({ mensaje: '✅ Cliente actualizado correctamente.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 

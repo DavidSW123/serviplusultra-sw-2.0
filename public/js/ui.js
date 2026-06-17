@@ -6,7 +6,10 @@ function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
 function abrirMenuLateral()  { document.getElementById('sideMenu').classList.add('open'); document.getElementById('overlayMenu').style.display = 'block'; }
 function cerrarMenuLateral() { document.getElementById('sideMenu').classList.remove('open'); document.getElementById('overlayMenu').style.display = 'none'; }
 
-function cerrarSesion() { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; }
+function cerrarSesion() {
+    fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
+        .finally(() => { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; });
+}
 
 function comprimirImagen(file, callback) {
     const reader = new FileReader();

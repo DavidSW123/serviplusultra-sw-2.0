@@ -1,8 +1,7 @@
 const { db }           = require('../config/db');
+const { errorServidor } = require('../utils/responder');
 const { registrarLog } = require('../utils/registrarLog');
-
-const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
-    || 'https://script.google.com/macros/s/AKfycbxwi8cCg4D0mGEK_Xh3V52AHMf31ESpvEbfmXgLNSw-k9GMt9_wauc3GicRqUvT9AkEow/exec';
+const { GOOGLE_SCRIPT_URL } = require('../config/env');
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -42,7 +41,7 @@ async function getAll(req, res) {
         `);
         res.json(rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -62,7 +61,7 @@ async function crear(req, res) {
         await registrarLog(usuario, 'Crear presupuesto', referencia, { referencia, cliente_id, total });
         res.json({ ok: true, referencia });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -80,7 +79,7 @@ async function editar(req, res) {
         await registrarLog(usuario, 'Editar presupuesto', `ID:${id}`, { id, total });
         res.json({ ok: true });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -96,7 +95,7 @@ async function cambiarEstado(req, res) {
         await registrarLog(usuario, 'Cambiar estado presupuesto', `ID:${id}`, { estado });
         res.json({ ok: true });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -129,7 +128,7 @@ async function eliminar(req, res) {
         await registrarLog(usuario, 'Eliminar presupuesto', ref, { id });
         res.json({ ok: true });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -178,7 +177,7 @@ async function convertirAOT(req, res) {
         await registrarLog(usuario, 'Convertir presupuesto a OT', p.referencia, { codigoOT });
         res.json({ ok: true, codigoOT });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -212,7 +211,7 @@ async function enviarEmail(req, res) {
         await registrarLog(usuario, 'Enviar presupuesto por email', p.referencia, { email: p.email });
         res.json({ ok: true });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -229,7 +228,7 @@ async function asociarOT(req, res) {
         await registrarLog(usuario, 'Asociar presupuesto a OT', `ID:${id}`, { ot_codigo });
         res.json({ ok: true });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -272,7 +271,7 @@ async function eliminarFacturaAsociada(req, res) {
         await registrarLog(usuario, `Eliminar factura ${tipo} de presupuesto`, `ID:${id}`, { numero: num });
         res.json({ ok: true, numero_eliminado: num });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 

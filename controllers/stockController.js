@@ -1,5 +1,6 @@
 const { db } = require('../config/db');
 
+const { errorServidor } = require('../utils/responder');
 /**
  * GET /api/stock
  * Devuelve todos los materiales en stock, ordenados por descripción.
@@ -11,7 +12,7 @@ async function getAll(req, res) {
         );
         res.json(result.rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -31,7 +32,7 @@ async function crear(req, res) {
         });
         res.json({ mensaje: 'Material añadido al stock.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 

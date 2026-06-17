@@ -1,5 +1,6 @@
 const { db } = require('../config/db');
 
+const { errorServidor } = require('../utils/responder');
 /**
  * GET /api/gastos
  * Devuelve todos los gastos de socios, más recientes primero.
@@ -12,7 +13,7 @@ async function getAll(req, res) {
         );
         res.json(result.rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -36,7 +37,7 @@ async function crear(req, res) {
         });
         res.json({ mensaje: 'Gasto registrado correctamente.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -52,7 +53,7 @@ async function eliminar(req, res) {
         });
         res.json({ mensaje: 'Gasto eliminado.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 

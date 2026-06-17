@@ -55,7 +55,10 @@
 
 function abrirMenuLateral()  { document.getElementById('sideMenu').classList.add('open');    document.getElementById('overlayMenu').style.display = 'block'; }
 function cerrarMenuLateral() { document.getElementById('sideMenu').classList.remove('open'); document.getElementById('overlayMenu').style.display = 'none';  }
-function cerrarSesionGlobal() { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; }
+function cerrarSesionGlobal() {
+    fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
+        .finally(() => { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; });
+}
 
 function abrirCambiarPasswordGlobal() {
     cerrarMenuLateral();

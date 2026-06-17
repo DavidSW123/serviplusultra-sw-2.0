@@ -1,3 +1,5 @@
+const { errorServidor } = require('../utils/responder');
+
 /**
  * POST /api/ia/escanear-ticket
  * Body: { imagenBase64 }
@@ -66,8 +68,7 @@ REGLAS DE ORO:
         res.json({ lineas });
 
     } catch (e) {
-        console.error('Error en escaneo IA:', e);
-        res.status(500).json({ error: `Fallo al procesar el ticket: ${e.message}` });
+        errorServidor(res, e, 'escanearTicket');
     }
 }
 

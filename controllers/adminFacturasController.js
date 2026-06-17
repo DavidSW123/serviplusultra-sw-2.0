@@ -1,4 +1,5 @@
 const { db }           = require('../config/db');
+const { errorServidor } = require('../utils/responder');
 const { registrarLog } = require('../utils/registrarLog');
 
 /**
@@ -23,7 +24,7 @@ async function listarPendientes(req, res) {
         `);
         res.json(rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -66,7 +67,7 @@ async function aprobarEliminacion(req, res) {
         await registrarLog(usuario, 'Aprobar eliminación factura', `Factura ${f.numero_factura || id}`, { id, numero: f.numero_factura }, 'APROBADO');
         res.json({ ok: true, mensaje: 'Factura eliminada.', numero_eliminado: f.numero_factura });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -96,7 +97,7 @@ async function rechazarEliminacion(req, res) {
         await registrarLog(usuario, 'Rechazar eliminación factura', `Factura ${f.numero_factura || id}`, { id, numero: f.numero_factura }, 'RECHAZADO');
         res.json({ ok: true, mensaje: 'Solicitud de eliminación rechazada.' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 

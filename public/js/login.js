@@ -12,9 +12,10 @@ document.getElementById('formLogin').addEventListener('submit', function(e) {
     const pass = document.getElementById('pass').value;
 
     fetch('/api/login', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ username: user, password: pass })
+        method:      'POST',
+        headers:     { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body:        JSON.stringify({ username: user, password: pass })
     })
     .then(res => res.json())
     .then(data => {

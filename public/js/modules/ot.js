@@ -14,16 +14,16 @@ function cargarOTs() {
             const btnF    = ot.estado === 'HECHO' ? `<button class="btn-factura" onclick="abrirGeneradorFactura(${ot.id})">💶 Factura</button>` : '';
             const btnE    = sesion.rol === 'admin'  ? `<button class="btn-editar" onclick="abrirEditarOT(${ot.id})">✏️</button>` : '';
             const nC      = ot.cliente_id ? (clientesGlobal.find(c => c.id === ot.cliente_id)?.nombre || '') : '';
-            const sC      = nC ? `<br><small style="color:#7f8c8d;">🏢 ${nC}</small>` : '';
-            const sT      = ot.tecnicos_nombres ? `<br><small style="color:#3498db; font-weight:bold;">👷 ${ot.tecnicos_nombres}</small>` : '';
+            const sC      = nC ? `<br><small style="color:#7f8c8d;">🏢 ${escapeHTML(nC)}</small>` : '';
+            const sT      = ot.tecnicos_nombres ? `<br><small style="color:#3498db; font-weight:bold;">👷 ${escapeHTML(ot.tecnicos_nombres)}</small>` : '';
             const clsEst  = ot.estado === 'HECHO' ? 'est-hecho' : (ot.estado === 'ANULADO' ? 'est-anulado' : 'est-pendiente');
 
             const sFact = ot.numero_factura
-                ? `<br><small style="color:#1abc9c; font-weight:bold;">📄 Factura: ${ot.numero_factura}</small>`
+                ? `<br><small style="color:#1abc9c; font-weight:bold;">📄 Factura: ${escapeHTML(ot.numero_factura)}</small>`
                 : '';
             cont.innerHTML += `<div class="ot-card">
                 <div class="ot-info">
-                    <strong>${ot.codigo_ot}</strong> - ${ot.marca} ${sC} ${sT} ${sFact}
+                    <strong>${escapeHTML(ot.codigo_ot)}</strong> - ${escapeHTML(ot.marca)} ${sC} ${sT} ${sFact}
                     <br><strong style="color:#e67e22;">Materiales/Tickets: ${ot.materiales_precio.toFixed(2)} €</strong>
                 </div>
                 <div class="actions">

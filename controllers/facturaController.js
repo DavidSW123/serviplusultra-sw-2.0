@@ -1,8 +1,8 @@
 const QRCode    = require('qrcode');
+const { errorServidor } = require('../utils/responder');
 const { db }    = require('../config/db');
 
-const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
-    || 'https://script.google.com/macros/s/AKfycbxwi8cCg4D0mGEK_Xh3V52AHMf31ESpvEbfmXgLNSw-k9GMt9_wauc3GicRqUvT9AkEow/exec';
+const { GOOGLE_SCRIPT_URL } = require('../config/env');
 
 /**
  * Genera el número de factura secuencial del año actual.
@@ -142,7 +142,7 @@ async function emitir(req, res) {
 
         res.json({ mensaje: 'Factura emitida', qr_data: qr, numero_factura, fecha_emision: fecha });
     } catch (e) {
-        res.status(500).json({ error: 'Error al emitir la factura: ' + e.message });
+        errorServidor(res, e, 'emitir');
     }
 }
 
@@ -233,7 +233,7 @@ async function actualizarLineas(req, res) {
         }
         res.json({ ok: true });
     } catch (e) {
-        res.status(500).json({ error: 'Error al guardar líneas: ' + e.message });
+        errorServidor(res, e, 'actualizarLineas');
     }
 }
 
@@ -280,7 +280,7 @@ async function emitirDesdePresupuesto(req, res) {
 
         res.json({ ok: true, numero_factura, fecha_emision: fecha, qr_data: qr });
     } catch (e) {
-        res.status(500).json({ error: 'Error al emitir desde presupuesto: ' + e.message });
+        errorServidor(res, e, 'emitirDesdePresupuesto');
     }
 }
 
@@ -305,7 +305,7 @@ async function purgarHuerfanas(req, res) {
         }
         res.json({ ok: true, eliminadas: huerfanas.length, numeros: huerfanas.map(h => h.numero_factura) });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -329,7 +329,7 @@ async function diagnostico(req, res) {
         `);
         res.json(rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -387,7 +387,7 @@ async function rectificar(req, res) {
             numero_rectificada: orig.numero_factura
         });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -417,7 +417,7 @@ async function getFactura(req, res) {
         if (!rows[0]) return res.status(404).json({ error: 'Factura no encontrada' });
         res.json(rows[0]);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -443,7 +443,7 @@ async function listarRectificativas(req, res) {
         `);
         res.json(rows);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
@@ -538,7 +538,7 @@ async function reasignarNumero(req, res) {
             qr_data:         qr
         });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        errorServidor(res, e);
     }
 }
 
