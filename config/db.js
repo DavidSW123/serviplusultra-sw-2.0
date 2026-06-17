@@ -1,9 +1,9 @@
-require('dotenv').config();
+const env = require('./env');
 const { createClient } = require('@libsql/client');
 
 const db = createClient({
-    url: process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN
+    url: env.TURSO_DATABASE_URL,
+    authToken: env.TURSO_AUTH_TOKEN
 });
 
 async function inicializarDB() {
@@ -135,22 +135,9 @@ async function inicializarDB() {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }
         }
 
-        // --- LIMPIEZA: facturas huérfanas (sin OT ni presupuesto vivo) ---
-        // Liberan sus números para que el gap-fill los reasigne.
-        try {
-            const { rows: huerfanas } = await db.execute(`
-                SELECT f.id, f.numero_factura
-                FROM facturas f
-                LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
-                LEFT JOIN presupuestos    p  ON p.id  = f.presupuesto_id
-                WHERE (f.ot_id IS NULL OR ot.id IS NULL)
-                  AND (f.presupuesto_id IS NULL OR p.id IS NULL)
-            `);
-            for (const h of huerfanas) {
-                await db.execute({ sql: `DELETE FROM facturas WHERE id=?`, args: [h.id] });
-                console.log(`🧹 Factura huérfana ${h.numero_factura || h.id} eliminada (número liberado)`);
-            }
-        } catch (_) { /* tabla aún no inicializada, ok */ }
+        // (Eliminado) La limpieza automática de facturas "huérfanas" en cada arranque
+        // borraba documentos fiscales en cada deploy. Retirado por riesgo de pérdida
+        // de datos y por incompatibilidad con la inmutabilidad de la numeración.
 
         // --- SEED: usuario admin por defecto si la tabla está vacía ---
         const { rows } = await db.execute("SELECT count(*) as count FROM usuarios");

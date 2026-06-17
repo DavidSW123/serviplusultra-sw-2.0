@@ -140,8 +140,7 @@ async function recuperarPassword(req, res) {
         });
 
         // Enviar email al correo corporativo
-        const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
-            || 'https://script.google.com/macros/s/AKfycbxwi8cCg4D0mGEK_Xh3V52AHMf31ESpvEbfmXgLNSw-k9GMt9_wauc3GicRqUvT9AkEow/exec';
+        const { GOOGLE_SCRIPT_URL } = require('../config/env');
         const emailEmpresa = 'serviplusultrasolutionssl@gmail.com';
 
         try {

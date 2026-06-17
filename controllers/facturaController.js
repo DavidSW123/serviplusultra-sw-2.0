@@ -1,8 +1,7 @@
 const QRCode    = require('qrcode');
 const { db }    = require('../config/db');
 
-const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL
-    || 'https://script.google.com/macros/s/AKfycbxwi8cCg4D0mGEK_Xh3V52AHMf31ESpvEbfmXgLNSw-k9GMt9_wauc3GicRqUvT9AkEow/exec';
+const { GOOGLE_SCRIPT_URL } = require('../config/env');
 
 /**
  * Genera el número de factura secuencial del año actual.
