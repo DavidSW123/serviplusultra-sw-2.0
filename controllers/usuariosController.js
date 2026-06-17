@@ -1,9 +1,24 @@
 const { db } = require('../config/db');
+const jwt    = require('jsonwebtoken');
+const { JWT_SECRET } = require('../config/env');
+
+const DURACION_SESION = 7 * 24 * 60 * 60; // 7 días en segundos
+
+/** Opciones de la cookie de sesión. `secure` se activa solo bajo HTTPS (Render). */
+function _opcionesCookie(req) {
+    return {
+        httpOnly: true,
+        secure:   req.secure,
+        sameSite: 'strict',
+        maxAge:   DURACION_SESION * 1000
+    };
+}
 
 /**
  * POST /api/login
  * Body: { username, password }
- * Público — no requiere middleware de auth.
+ * Verifica credenciales y emite una cookie de sesión firmada (JWT).
+ * (El hash de contraseñas llega en el Bloque 2; de momento compara el valor guardado.)
  */
 async function login(req, res) {
     try {
@@ -18,6 +33,13 @@ async function login(req, res) {
         }
 
         const usuario = result.rows[0];
+        const token = jwt.sign(
+            { username: usuario.username, rol: usuario.rol },
+            JWT_SECRET,
+            { expiresIn: DURACION_SESION }
+        );
+        res.cookie('token', token, _opcionesCookie(req));
+
         res.json({
             mensaje:  'Login exitoso',
             username: usuario.username,
@@ -27,6 +49,17 @@ async function login(req, res) {
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
+}
+
+/** POST /api/logout — borra la cookie de sesión. */
+function logout(req, res) {
+    res.clearCookie('token', { httpOnly: true, secure: req.secure, sameSite: 'strict' });
+    res.json({ ok: true });
+}
+
+/** GET /api/me — devuelve el usuario de la sesión actual (tras middleware autenticado). */
+function me(req, res) {
+    res.json({ username: req.usuario.username, rol: req.usuario.rol });
 }
 
 /**
@@ -184,4 +217,4 @@ async function recuperarPassword(req, res) {
     }
 }
 
-module.exports = { login, actualizarFoto, cambiarPassword, crearTecnico, getNombres, recuperarPassword };
+module.exports = { login, logout, me, actualizarFoto, cambiarPassword, crearTecnico, getNombres, recuperarPassword };

@@ -1,9 +1,10 @@
 const env       = require('./config/env');
-const express   = require('express');
-const cors      = require('cors');
-const helmet    = require('helmet');
-const rateLimit = require('express-rate-limit');
-const path      = require('path');
+const express      = require('express');
+const cors         = require('cors');
+const helmet       = require('helmet');
+const rateLimit    = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
+const path         = require('path');
 
 const { inicializarDB } = require('./config/db');
 const apiRoutes         = require('./routes/apiRoutes');
@@ -23,6 +24,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: env.APP_ORIGIN, credentials: true }));
 
 app.use(express.json({ limit: '50mb' }));
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // ── Rate limiting ──────────────────────────────────────────────

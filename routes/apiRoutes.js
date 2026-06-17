@@ -20,6 +20,8 @@ const adminFacturasController   = require('../controllers/adminFacturasControlle
 // USUARIOS
 // ============================================================
 router.post  ('/login',               usuariosController.login);
+router.post  ('/logout',              usuariosController.logout);
+router.get   ('/me',                  autenticado, usuariosController.me);
 router.post  ('/recuperar-password',  usuariosController.recuperarPassword);
 router.put   ('/usuarios/foto',       autenticado, usuariosController.actualizarFoto);
 router.put   ('/usuarios/password',   autenticado, usuariosController.cambiarPassword);

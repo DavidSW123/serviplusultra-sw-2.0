@@ -26,6 +26,7 @@ module.exports = {
     TURSO_DATABASE_URL: requerida('TURSO_DATABASE_URL'),
     TURSO_AUTH_TOKEN:   requerida('TURSO_AUTH_TOKEN'),
     GOOGLE_SCRIPT_URL:  requerida('GOOGLE_SCRIPT_URL'),
+    JWT_SECRET:         requerida('JWT_SECRET'),
     APP_ORIGIN:         opcional('APP_ORIGIN', 'https://serviplusultra-sw-2-0.onrender.com'),
     PORT:               opcional('PORT', '3000')
 };

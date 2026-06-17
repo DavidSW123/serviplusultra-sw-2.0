@@ -1,13 +1,13 @@
 /**
  * Middlewares de autorización por rol.
  *
- * El sistema actual propaga el rol y el usuario mediante cabeceras HTTP
- * (x-rol, x-user) que el frontend adjunta en cada petición.
- *
- * Cada función es un middleware Express estándar: (req, res, next) =>
- * Se compone en las rutas que lo necesiten, p.ej:
- *   router.delete('/ot/:id', soloAdmin, otController.eliminar);
+ * La sesión viaja en una cookie httpOnly firmada (JWT). El usuario y el rol se
+ * derivan SOLO del token verificado en el servidor — nunca de cabeceras que
+ * pueda poner el cliente. Un token ausente/inválido/caducado => 401.
  */
+
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../config/env');
 
 const ROLES = {
     ADMIN:    'admin',
@@ -15,35 +15,44 @@ const ROLES = {
     TECNICO:  'tecnico'
 };
 
-/** Cualquier usuario con sesión activa (cabeceras presentes). */
-function autenticado(req, res, next) {
-    if (!req.headers['x-rol'] || !req.headers['x-user']) {
-        return res.status(401).json({ error: 'No autenticado. Inicia sesión.' });
+/** Devuelve el payload verificado de la cookie, o null si no es válido. */
+function _sesion(req) {
+    const token = req.cookies && req.cookies.token;
+    if (!token) return null;
+    try {
+        return jwt.verify(token, JWT_SECRET);
+    } catch (_) {
+        return null;
     }
-    // Inyectamos en req para que los controllers no tengan que leer cabeceras directamente
-    req.usuario = {
-        username: req.headers['x-user'],
-        rol:      req.headers['x-rol']
-    };
+}
+
+/** Cualquier usuario con sesión válida. */
+function autenticado(req, res, next) {
+    const u = _sesion(req);
+    if (!u) return res.status(401).json({ error: 'No autenticado. Inicia sesión.' });
+    req.usuario = { username: u.username, rol: u.rol };
     next();
 }
 
-/** Solo CEO / CFO (rol admin). */
+/** Solo rol admin. */
 function soloAdmin(req, res, next) {
-    if (req.headers['x-rol'] !== ROLES.ADMIN) {
+    const u = _sesion(req);
+    if (!u) return res.status(401).json({ error: 'No autenticado. Inicia sesión.' });
+    if (u.rol !== ROLES.ADMIN) {
         return res.status(403).json({ error: 'Acceso restringido: solo administradores.' });
     }
-    req.usuario = { username: req.headers['x-user'], rol: req.headers['x-rol'] };
+    req.usuario = { username: u.username, rol: u.rol };
     next();
 }
 
-/** Admins + COO (rol director). Excluye técnicos. */
+/** Admins + director. Excluye técnicos. */
 function adminODirector(req, res, next) {
-    const rol = req.headers['x-rol'];
-    if (rol !== ROLES.ADMIN && rol !== ROLES.DIRECTOR) {
+    const u = _sesion(req);
+    if (!u) return res.status(401).json({ error: 'No autenticado. Inicia sesión.' });
+    if (u.rol !== ROLES.ADMIN && u.rol !== ROLES.DIRECTOR) {
         return res.status(403).json({ error: 'Acceso restringido: sin permisos suficientes.' });
     }
-    req.usuario = { username: req.headers['x-user'], rol };
+    req.usuario = { username: u.username, rol: u.rol };
     next();
 }
 

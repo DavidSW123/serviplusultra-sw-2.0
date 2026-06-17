@@ -92,7 +92,10 @@
         const sesion = JSON.parse(sesionStr);
         document.getElementById('hubNombre').innerText = sesion.username;
         document.getElementById('hubRol').innerText    = sesion.rol.charAt(0).toUpperCase() + sesion.rol.slice(1);
-        function cerrarSesionHub() { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; }
+        function cerrarSesionHub() {
+            fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
+                .finally(() => { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; });
+        }
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
     </script>
 </body>

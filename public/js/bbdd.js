@@ -1,7 +1,8 @@
 const sesionStr = localStorage.getItem('sesionPlusUltra');
 if (!sesionStr) window.location.href = '/login';
 const sesion = JSON.parse(sesionStr);
-const headersSeguridad = { 'Content-Type': 'application/json', 'x-rol': sesion.rol, 'x-user': sesion.username };
+// La sesión viaja en cookie httpOnly (se envía sola en mismo origen). Solo Content-Type.
+const headersSeguridad = { 'Content-Type': 'application/json' };
 const prefijoAnoActual = `OT${new Date().getFullYear().toString().slice(-2)}/`;
 
 document.getElementById('infoUsuarioBBDD').innerHTML = `👤 <strong>${sesion.username.toUpperCase()}</strong> (${sesion.rol})`;
@@ -19,6 +20,7 @@ async function cargarDatos() {
         cargarUsuariosParaOT();
 
         const resClientes = await fetch('/api/clientes', { headers: headersSeguridad });
+        if (resClientes.status === 401) { localStorage.removeItem('sesionPlusUltra'); window.location.href = '/login'; return; }
         clientesGlobal = await resClientes.json();
 
         const selectCliente = document.getElementById('filtroCliente');
