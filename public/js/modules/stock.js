@@ -14,7 +14,7 @@ function cargarStock() {
             const icon     = s.imagen ? `<a href="${s.imagen}" target="_blank" title="Ver Ticket">📄</a>` : '-';
             const rowClass = s.cantidad <= 0 ? 'background:#fdedec; color:#e74c3c;' : '';
             tbody.innerHTML += `<tr style="${rowClass}">
-                <td><strong>${s.descripcion}</strong></td>
+                <td><strong>${escapeHTML(s.descripcion)}</strong></td>
                 <td>${s.cantidad} uds</td>
                 <td>${s.precio_unidad.toFixed(2)} €</td>
                 <td style="text-align:center; font-size:1.2em;">${icon}</td>
@@ -124,7 +124,7 @@ function renderizarLineasMateriales() {
     cont.innerHTML = '';
     arrayLineasMat.forEach(l => {
         let opcionesStock = '<option value="">-- Elige del almacén --</option>';
-        stockGlobal.forEach(s => { if (s.cantidad > 0) opcionesStock += `<option value="${s.id}">${s.descripcion} (${s.cantidad} disp.)</option>`; });
+        stockGlobal.forEach(s => { if (s.cantidad > 0) opcionesStock += `<option value="${s.id}">${escapeHTML(s.descripcion)} (${s.cantidad} disp.)</option>`; });
         const htmlDesc = l.is_stock
             ? `<select onchange="onChangeLinea(${l.id}, 'stock_id', this.value)" required>${opcionesStock}</select>`
             : `<input type="text" placeholder="Ej: Rollo Cable..." value="${l.descripcion}" oninput="onChangeLinea(${l.id}, 'descripcion', this.value)" required>`;

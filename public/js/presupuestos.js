@@ -35,7 +35,7 @@ function _poblarSelectClientes() {
     const sel = document.getElementById('presCliente');
     sel.innerHTML = '<option value="">— Sin cliente asignado —</option>';
     clientesPresGlobal.forEach(c => {
-        sel.innerHTML += `<option value="${c.id}">${c.nombre}${c.nif ? ' — ' + c.nif : ''}</option>`;
+        sel.innerHTML += `<option value="${c.id}">${escapeHTML(c.nombre)}${c.nif ? ' — ' + escapeHTML(c.nif) : ''}</option>`;
     });
 }
 
@@ -51,22 +51,22 @@ function renderizarPresupuestos(lista) {
         const estado = p.estado || 'BORRADOR';
         const acciones = _accionesPorEstado(p, estado);
         const otBadge = p.ot_asociada_codigo
-            ? `<span style="font-size:0.75em; background:#e8f8f5; color:#1abc9c; padding:2px 7px; border-radius:10px; margin-left:6px;">OT: ${p.ot_asociada_codigo}</span>`
+            ? `<span style="font-size:0.75em; background:#e8f8f5; color:#1abc9c; padding:2px 7px; border-radius:10px; margin-left:6px;">OT: ${escapeHTML(p.ot_asociada_codigo)}</span>`
             : '';
         const factBadges = [
-            p.proforma_numero     ? `<span style="font-size:0.72em; background:#ebf5fb; color:#2980b9; padding:2px 7px; border-radius:10px;">Proforma: ${p.proforma_numero}</span>` : '',
-            p.factura_final_numero ? `<span style="font-size:0.72em; background:#eafaf1; color:#27ae60; padding:2px 7px; border-radius:10px;">Final: ${p.factura_final_numero}</span>` : ''
+            p.proforma_numero     ? `<span style="font-size:0.72em; background:#ebf5fb; color:#2980b9; padding:2px 7px; border-radius:10px;">Proforma: ${escapeHTML(p.proforma_numero)}</span>` : '',
+            p.factura_final_numero ? `<span style="font-size:0.72em; background:#eafaf1; color:#27ae60; padding:2px 7px; border-radius:10px;">Final: ${escapeHTML(p.factura_final_numero)}</span>` : ''
         ].filter(Boolean).join(' ');
         return `
         <div class="pres-card ${estado}" onclick="verPresupuesto(${p.id})" id="pcard_${p.id}">
             <div>
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <span class="pres-ref">${p.referencia}</span>
+                    <span class="pres-ref">${escapeHTML(p.referencia)}</span>
                     <span class="badge-estado ${estado}">${_textoEstado(estado)}</span>
                     ${otBadge}
                 </div>
-                <div class="pres-cliente">${p.cliente_nombre || '— Sin cliente —'}</div>
-                <div class="pres-desc">${p.descripcion || ''}</div>
+                <div class="pres-cliente">${escapeHTML(p.cliente_nombre || '— Sin cliente —')}</div>
+                <div class="pres-desc">${escapeHTML(p.descripcion || '')}</div>
                 ${factBadges ? `<div style="margin-top:5px; display:flex; gap:6px; flex-wrap:wrap;">${factBadges}</div>` : ''}
             </div>
             <div class="pres-meta">
@@ -177,13 +177,13 @@ function _renderFacturasAsociadas(p) {
     // Aviso: no sabemos aquí si la factura ha sido enviada; el backend bloqueará si procede.
     if (p.proforma_numero) {
         items.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#ebf5fb; border-radius:6px; margin-bottom:6px;">
-            <span><strong>Proforma:</strong> ${p.proforma_numero} ${p.proforma_total ? `(${fmtP(p.proforma_total)})` : ''}</span>
+            <span><strong>Proforma:</strong> ${escapeHTML(p.proforma_numero)} ${p.proforma_total ? `(${fmtP(p.proforma_total)})` : ''}</span>
             <button class="btn-eliminar" onclick="eliminarFacturaAsociada(${p.id},'proforma')">🗑️ Eliminar factura</button>
         </div>`);
     }
     if (p.factura_final_numero) {
         items.push(`<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#eafaf1; border-radius:6px; margin-bottom:6px;">
-            <span><strong>Factura Final:</strong> ${p.factura_final_numero}</span>
+            <span><strong>Factura Final:</strong> ${escapeHTML(p.factura_final_numero)}</span>
             <button class="btn-eliminar" onclick="eliminarFacturaAsociada(${p.id},'final')">🗑️ Eliminar factura</button>
         </div>`);
     }
@@ -358,7 +358,7 @@ function abrirEmitirFacturaPres(id, tipo) {
         const restante  = yaTienePF ? Math.max(0, p.total - (p.proforma_total || 0)) : p.total;
         document.getElementById('emitirFactPresTitle').innerText = 'Emitir Factura Final';
         document.getElementById('emitirFactPresDesc').innerHTML = yaTienePF
-            ? `Proforma emitida: <strong>${p.proforma_numero}</strong> (${fmtP(p.proforma_total)})<br>
+            ? `Proforma emitida: <strong>${escapeHTML(p.proforma_numero)}</strong> (${fmtP(p.proforma_total)})<br>
                Se facturará el importe restante: <strong>${fmtP(restante)}</strong>`
             : `No hay proforma previa. Se facturará el total: <strong>${fmtP(p.total)}</strong>`;
     }
@@ -446,7 +446,7 @@ async function _generarFacturaPDF(p, tipo, numero_factura, fecha_emision, base, 
 
     document.getElementById('pdfFactPresLineas').innerHTML = (lineas || []).map((l, i) =>
         `<tr style="background:${i%2===0?'#fff':'#f8f9fa'}">
-            <td style="padding:9px 14px; border-bottom:1px solid #f0f0f0;">${l.descripcion || ''}</td>
+            <td style="padding:9px 14px; border-bottom:1px solid #f0f0f0;">${escapeHTML(l.descripcion || '')}</td>
             <td style="padding:9px 14px; border-bottom:1px solid #f0f0f0; text-align:right; font-weight:600;">${fmtP(l.importe)}</td>
         </tr>`
     ).join('');
@@ -502,9 +502,9 @@ function _renderOTsBusqueda(q) {
         return `<div onclick="confirmarAsociarOT(${ot.id},'${ot.codigo_ot}')"
                      style="padding:11px 14px; cursor:pointer; border-bottom:1px solid #eee; transition:background .12s;"
                      onmouseover="this.style.background='#f0f9f7'" onmouseout="this.style.background=''">
-            <div style="font-weight:700; color:#2c3e50;">${ot.codigo_ot}</div>
-            <div style="font-size:0.82em; color:#7f8c8d;">${ot.marca || ''} · ${ot.tipo_urgencia || ''} · ${fechaL}</div>
-            ${ot.numero_factura ? `<div style="font-size:0.78em; color:#1abc9c;">Factura: ${ot.numero_factura}</div>` : ''}
+            <div style="font-weight:700; color:#2c3e50;">${escapeHTML(ot.codigo_ot)}</div>
+            <div style="font-size:0.82em; color:#7f8c8d;">${escapeHTML(ot.marca || '')} · ${escapeHTML(ot.tipo_urgencia || '')} · ${fechaL}</div>
+            ${ot.numero_factura ? `<div style="font-size:0.78em; color:#1abc9c;">Factura: ${escapeHTML(ot.numero_factura)}</div>` : ''}
         </div>`;
     }).join('');
 }
@@ -548,7 +548,7 @@ function _rellenarPDF(p) {
     const lineas = JSON.parse(p.lineas || '[]');
     document.getElementById('pdfLineas').innerHTML = lineas.map((l, i) =>
         `<tr style="background:${i%2===0?'#fff':'#f8f9fa'}">
-            <td style="padding:9px 14px; border-bottom:1px solid #f0f0f0;">${l.descripcion || ''}</td>
+            <td style="padding:9px 14px; border-bottom:1px solid #f0f0f0;">${escapeHTML(l.descripcion || '')}</td>
             <td style="padding:9px 14px; border-bottom:1px solid #f0f0f0; text-align:right; font-weight:600;">${fmtP(l.importe)}</td>
         </tr>`
     ).join('');

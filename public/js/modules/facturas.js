@@ -138,7 +138,7 @@ async function abrirGeneradorFactura(id) {
         if (wrap) {
             const rectId = ot.factura_rectificada_por_id;
             wrap.insertAdjacentHTML('beforeend',
-                `<span id="tagRectificada" class="fact-pill fact-pill-orange" onclick="verRectificativa(${rectId})" title="Click para ver la rectificativa">📝 Rectificada por ${ot.factura_rectificativa_numero || ''} →</span>`);
+                `<span id="tagRectificada" class="fact-pill fact-pill-orange" onclick="verRectificativa(${rectId})" title="Click para ver la rectificativa">📝 Rectificada por ${escapeHTML(ot.factura_rectificativa_numero || '')} →</span>`);
         }
         const factHeader = document.querySelector('.datos-factura');
         if (factHeader) {
@@ -153,7 +153,7 @@ async function abrirGeneradorFactura(id) {
             const wrap = document.getElementById('factBadgesWrap');
             if (wrap) {
                 wrap.insertAdjacentHTML('beforeend',
-                    `<span id="tagHistorial" class="fact-pill fact-pill-blue" onclick="abrirFacturaAnterior(${ot.factura_anterior_id})" title="Click para ver la factura anterior rectificada">📜 Refactura de ${ot.factura_anterior_numero}${ot.factura_anterior_rectificativa ? ' (rect. ' + ot.factura_anterior_rectificativa + ')' : ''} →</span>`);
+                    `<span id="tagHistorial" class="fact-pill fact-pill-blue" onclick="abrirFacturaAnterior(${ot.factura_anterior_id})" title="Click para ver la factura anterior rectificada">📜 Refactura de ${escapeHTML(ot.factura_anterior_numero)}${ot.factura_anterior_rectificativa ? ' (rect. ' + escapeHTML(ot.factura_anterior_rectificativa) + ')' : ''} →</span>`);
             }
         }
     }
@@ -268,10 +268,10 @@ async function verSolicitudesEliminacion() {
         tbody.innerHTML = lista.map(f => {
             const tipo = f.es_rectificativa ? '📝 Rectificativa' : '📄 Regular';
             return `<tr>
-                <td><strong>${f.numero_factura}</strong></td>
+                <td><strong>${escapeHTML(f.numero_factura)}</strong></td>
                 <td>${f.fecha_emision || '—'}</td>
-                <td>${f.cliente_nombre || '—'}</td>
-                <td>${f.codigo_ot || f.presupuesto_ref || '—'}</td>
+                <td>${escapeHTML(f.cliente_nombre || '—')}</td>
+                <td>${escapeHTML(f.codigo_ot || f.presupuesto_ref || '—')}</td>
                 <td style="text-align:right;"><strong>${parseFloat(f.total||0).toFixed(2)} €</strong></td>
                 <td>${tipo}</td>
                 <td style="text-align:center;">
@@ -324,13 +324,13 @@ async function verListaRectificativas() {
     } else {
         tbody.innerHTML = lista.map(r => `
             <tr>
-                <td><strong style="color:#e67e22;">${r.numero_factura}</strong></td>
+                <td><strong style="color:#e67e22;">${escapeHTML(r.numero_factura)}</strong></td>
                 <td>${r.fecha_emision || '—'}</td>
-                <td>${r.orig_numero || '—'}</td>
-                <td>${r.cliente_nombre || '—'}</td>
-                <td>${r.codigo_ot || r.presupuesto_ref || '—'}</td>
+                <td>${escapeHTML(r.orig_numero || '—')}</td>
+                <td>${escapeHTML(r.cliente_nombre || '—')}</td>
+                <td>${escapeHTML(r.codigo_ot || r.presupuesto_ref || '—')}</td>
                 <td style="text-align:right;"><strong>${parseFloat(r.total||0).toFixed(2)} €</strong></td>
-                <td style="font-size:0.85em; color:#7f8c8d;">${(r.motivo_rectificacion||'').substring(0,60)}${(r.motivo_rectificacion||'').length>60?'...':''}</td>
+                <td style="font-size:0.85em; color:#7f8c8d;">${escapeHTML((r.motivo_rectificacion||'').substring(0,60))}${(r.motivo_rectificacion||'').length>60?'...':''}</td>
                 <td><button class="btn-secundario" style="padding:5px 10px; font-size:0.85em;" onclick="verRectificativa(${r.id})">Ver</button></td>
             </tr>
         `).join('');
@@ -382,11 +382,11 @@ async function verRectificativa(facturaId) {
         if (f.es_rectificativa) {
             // Es la propia rectificativa: muestra a qué original anula (estático, ya estás dentro)
             wrap.insertAdjacentHTML('beforeend',
-                `<span id="tagRectificada" class="fact-pill fact-pill-orange fact-pill-static" title="${(f.motivo_rectificacion || '').replace(/"/g,'&quot;')}">📝 Rectificativa de ${f.rectifica_a_numero || ''}</span>`);
+                `<span id="tagRectificada" class="fact-pill fact-pill-orange fact-pill-static" title="${(f.motivo_rectificacion || '').replace(/"/g,'&quot;')}">📝 Rectificativa de ${escapeHTML(f.rectifica_a_numero || '')}</span>`);
         } else if (f.rectificada_por_id) {
             // Es la factura ORIGINAL rectificada: badge clickable que abre la rectificativa
             wrap.insertAdjacentHTML('beforeend',
-                `<span id="tagRectificada" class="fact-pill fact-pill-orange" onclick="verRectificativa(${f.rectificada_por_id})" title="Click para ver la rectificativa">📝 Rectificada por ${f.rectificada_por_numero || ''} →</span>`);
+                `<span id="tagRectificada" class="fact-pill fact-pill-orange" onclick="verRectificativa(${f.rectificada_por_id})" title="Click para ver la rectificativa">📝 Rectificada por ${escapeHTML(f.rectificada_por_numero || '')} →</span>`);
         }
     }
 
@@ -453,7 +453,7 @@ function verHistorialEnvios() {
         cont.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888;">Sin envíos registrados</td></tr>';
     } else {
         cont.innerHTML = arr.map((e, i) =>
-            `<tr><td>${i + 1}</td><td>${e.email || '-'}</td><td>${e.fecha || '-'}</td></tr>`
+            `<tr><td>${i + 1}</td><td>${escapeHTML(e.email || '-')}</td><td>${escapeHTML(e.fecha || '-')}</td></tr>`
         ).join('');
     }
     abrirModal('modalHistorialEnvios');

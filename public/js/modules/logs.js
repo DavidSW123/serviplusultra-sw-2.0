@@ -15,10 +15,10 @@ function abrirLogs() {
 
             // Fila principal (click para expandir detalle)
             tbody.innerHTML += `<tr onclick="toggleDetalleLog(${log.id})" style="cursor:pointer;">
-                <td>${log.fecha}</td>
-                <td>${log.usuario}</td>
-                <td>${log.accion}</td>
-                <td>${log.referencia}</td>
+                <td>${escapeHTML(log.fecha)}</td>
+                <td>${escapeHTML(log.usuario)}</td>
+                <td>${escapeHTML(log.accion)}</td>
+                <td>${escapeHTML(log.referencia)}</td>
                 <td><span class="badge-log" style="background:#${bc}">${log.estado}</span></td>
                 <td>${btnAp}</td>
             </tr>
@@ -43,32 +43,32 @@ function _textoHumano(log) {
         const tecns = d.tecnicos_nombres || 'sin asignar';
         const horas = d.horas ? `${d.horas} h` : '—';
         const mat   = d.materiales_precio > 0 ? ` Se añadieron materiales por ${parseFloat(d.materiales_precio).toFixed(2)} €.` : '';
-        return `${log.usuario} solicitó crear la orden <strong>${d.codigo_ot}</strong> para ${tecns}, con ${horas} de trabajo en "${d.marca}".${mat}`;
+        return `${escapeHTML(log.usuario)} solicitó crear la orden <strong>${escapeHTML(d.codigo_ot)}</strong> para ${escapeHTML(tecns)}, con ${horas} de trabajo en "${escapeHTML(d.marca)}".${mat}`;
     }
 
     if (accion === 'Eliminar OT') {
-        return `${log.usuario} solicitó <strong>eliminar</strong> la orden con referencia "${log.referencia}".`;
+        return `${escapeHTML(log.usuario)} solicitó <strong>eliminar</strong> la orden con referencia "${escapeHTML(log.referencia)}".`;
     }
 
     if (accion === 'Editar OT') {
-        if (d.nuevoEstado) return `${log.usuario} cambió el estado de la orden a <strong>${d.nuevoEstado}</strong>.`;
+        if (d.nuevoEstado) return `${escapeHTML(log.usuario)} cambió el estado de la orden a <strong>${escapeHTML(d.nuevoEstado)}</strong>.`;
         const campos = [];
         if (d.horas)            campos.push(`horas: ${d.horas}`);
-        if (d.marca)            campos.push(`descripción: "${d.marca}"`);
-        if (d.tipo_urgencia)    campos.push(`urgencia: ${d.tipo_urgencia}`);
-        if (d.tecnicos_nombres) campos.push(`técnicos: ${d.tecnicos_nombres}`);
-        return `${log.usuario} modificó la orden <strong>${d.codigo_ot || log.referencia}</strong>` +
+        if (d.marca)            campos.push(`descripción: "${escapeHTML(d.marca)}"`);
+        if (d.tipo_urgencia)    campos.push(`urgencia: ${escapeHTML(d.tipo_urgencia)}`);
+        if (d.tecnicos_nombres) campos.push(`técnicos: ${escapeHTML(d.tecnicos_nombres)}`);
+        return `${escapeHTML(log.usuario)} modificó la orden <strong>${escapeHTML(d.codigo_ot || log.referencia)}</strong>` +
                (campos.length ? ` — ${campos.join(', ')}.` : '.');
     }
 
     if (accion === 'Eliminar OT') {
-        return `${log.usuario} eliminó la orden "${log.referencia}".`;
+        return `${escapeHTML(log.usuario)} eliminó la orden "${escapeHTML(log.referencia)}".`;
     }
 
     // Fallback genérico legible
     const pares = Object.entries(d)
         .filter(([k]) => !['imagen', 'logo', 'lineas_materiales'].includes(k))
-        .map(([k, v]) => `${k}: ${v}`).join(' · ');
+        .map(([k, v]) => `${escapeHTML(k)}: ${escapeHTML(v)}`).join(' · ');
     return pares || null;
 }
 
@@ -76,7 +76,7 @@ function _renderDetalleLog(log) {
     const texto = _textoHumano(log);
     return `<div style="font-size:0.9em; padding:5px 0;">
         <span style="font-size:1.1em;">${texto || 'Sin detalles adicionales.'}</span>
-        <br><small style="color:#aaa; margin-top:6px; display:block;">${log.fecha} · ID #${log.id}</small>
+        <br><small style="color:#aaa; margin-top:6px; display:block;">${escapeHTML(log.fecha)} · ID #${log.id}</small>
     </div>`;
 }
 

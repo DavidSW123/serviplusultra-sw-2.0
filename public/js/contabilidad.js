@@ -53,8 +53,8 @@ function abrirDetalle(titulo, columnas, filas) {
 function detalleIngresos() {
     if (!_dash) return;
     const filas = _dash.facturas_lista.map(f => [
-        f.codigo_ot || '—',
-        f.cliente_nombre || '— Sin cliente —',
+        escapeHTML(f.codigo_ot || '—'),
+        escapeHTML(f.cliente_nombre || '— Sin cliente —'),
         f.fecha_emision ? f.fecha_emision.split('T')[0] : '—',
         fmt(f.base_imponible),
         fmt(f.iva),
@@ -67,9 +67,9 @@ function detalleMateriales() {
     if (!_dash) return;
     const ots = _dash.ots_lista.filter(o => parseFloat(o.materiales_precio) > 0);
     const filas = ots.map(o => [
-        o.codigo_ot,
-        o.cliente_nombre || '— Sin cliente —',
-        o.tecnicos_nombres || '—',
+        escapeHTML(o.codigo_ot),
+        escapeHTML(o.cliente_nombre || '— Sin cliente —'),
+        escapeHTML(o.tecnicos_nombres || '—'),
         `<span class="badge-est ${o.estado}">${o.estado}</span>`,
         `<strong>${fmt(o.materiales_precio)}</strong>`
     ]);
@@ -80,9 +80,9 @@ function detalleCosteMO() {
     if (!_dash) return;
     const ots = _dash.ots_lista.filter(o => o.estado === 'HECHO');
     const filas = ots.map(o => [
-        o.codigo_ot,
-        o.cliente_nombre || '— Sin cliente —',
-        o.tecnicos_nombres || '—',
+        escapeHTML(o.codigo_ot),
+        escapeHTML(o.cliente_nombre || '— Sin cliente —'),
+        escapeHTML(o.tecnicos_nombres || '—'),
         `${parseFloat(o.horas || 0).toFixed(1)} h`,
         `${o.num_tecnicos} tec.`,
         `${parseFloat(o.precio_hora || 15).toFixed(2)} €/h`,
@@ -94,10 +94,10 @@ function detalleCosteMO() {
 function detalleGastos() {
     if (!_dash) return;
     const filas = _dash.gastos_lista.map(g => [
-        g.pagador,
-        g.concepto,
+        escapeHTML(g.pagador),
+        escapeHTML(g.concepto),
         g.fecha || '—',
-        g.implicados || '—',
+        escapeHTML(g.implicados || '—'),
         `<strong>${fmt(g.importe)}</strong>`
     ]);
     abrirDetalle('💸 Gastos generales socios', ['Pagador', 'Concepto', 'Fecha', 'Implicados', 'Importe'], filas);
@@ -131,10 +131,10 @@ function detalleOTsPorEstado(estado) {
     if (!_dash) return;
     const ots = _dash.ots_lista.filter(o => o.estado === estado);
     const filas = ots.map(o => [
-        o.codigo_ot,
-        o.cliente_nombre || '— Sin cliente —',
-        o.marca || '—',
-        o.tecnicos_nombres || '—',
+        escapeHTML(o.codigo_ot),
+        escapeHTML(o.cliente_nombre || '— Sin cliente —'),
+        escapeHTML(o.marca || '—'),
+        escapeHTML(o.tecnicos_nombres || '—'),
         `${parseFloat(o.horas || 0).toFixed(1)} h`,
         fmt(o.materiales_precio)
     ]);
@@ -146,7 +146,7 @@ function detalleClienteIngresos(c) {
     const ots = _dash.ots_lista.filter(o => o.cliente_nombre === c.cliente);
     const facturas = _dash.facturas_lista.filter(f => f.cliente_nombre === c.cliente);
     const filasFact = facturas.map(f => [
-        f.codigo_ot || '—',
+        escapeHTML(f.codigo_ot || '—'),
         f.fecha_emision ? f.fecha_emision.split('T')[0] : '—',
         fmt(f.base_imponible),
         `<strong>${fmt(f.total)}</strong>`
@@ -158,9 +158,9 @@ function detalleClienteMateriales(c) {
     if (!_dash) return;
     const ots = _dash.ots_lista.filter(o => o.cliente_nombre === c.cliente && parseFloat(o.materiales_precio) > 0);
     const filas = ots.map(o => [
-        o.codigo_ot,
+        escapeHTML(o.codigo_ot),
         `<span class="badge-est ${o.estado}">${o.estado}</span>`,
-        o.tecnicos_nombres || '—',
+        escapeHTML(o.tecnicos_nombres || '—'),
         `<strong>${fmt(o.materiales_precio)}</strong>`
     ]);
     abrirDetalle(`🔧 Materiales en OTs de "${c.cliente}"`, ['OT', 'Estado', 'Técnicos', 'Materiales'], filas);
@@ -170,9 +170,9 @@ function detalleClienteOTs(c) {
     if (!_dash) return;
     const ots = _dash.ots_lista.filter(o => o.cliente_nombre === c.cliente);
     const filas = ots.map(o => [
-        o.codigo_ot,
-        o.marca || '—',
-        o.tecnicos_nombres || '—',
+        escapeHTML(o.codigo_ot),
+        escapeHTML(o.marca || '—'),
+        escapeHTML(o.tecnicos_nombres || '—'),
         o.fecha_encargo ? o.fecha_encargo.split('T')[0] : '—',
         `<span class="badge-est ${o.estado}">${o.estado}</span>`,
         fmt(o.materiales_precio)
@@ -187,9 +187,9 @@ function detalleTecnico(t) {
         o.estado === 'HECHO' && (o.tecnicos_nombres || '').includes(nombre.split(',')[0].trim())
     );
     const filas = ots.map(o => [
-        o.codigo_ot,
-        o.cliente_nombre || '— Sin cliente —',
-        o.marca || '—',
+        escapeHTML(o.codigo_ot),
+        escapeHTML(o.cliente_nombre || '— Sin cliente —'),
+        escapeHTML(o.marca || '—'),
         `${parseFloat(o.horas || 0).toFixed(1)} h`,
         `${parseFloat(o.precio_hora || 15).toFixed(2)} €/h`,
         `<strong>${fmt(o.coste_mo)}</strong>`
@@ -201,8 +201,8 @@ function detalleMes(mes) {
     if (!_dash) return;
     const facturas = _dash.facturas_lista.filter(f => f.fecha_emision && f.fecha_emision.startsWith(mes));
     const filas = facturas.map(f => [
-        f.codigo_ot || '—',
-        f.cliente_nombre || '— Sin cliente —',
+        escapeHTML(f.codigo_ot || '—'),
+        escapeHTML(f.cliente_nombre || '— Sin cliente —'),
         f.fecha_emision ? f.fecha_emision.split('T')[0] : '—',
         fmt(f.base_imponible),
         `<strong>${fmt(f.total)}</strong>`
@@ -299,22 +299,22 @@ API.get('/api/contabilidad/resumen').then(data => {
 
     // Tablas con click en fila
     renderTabla('tablaHoras', data.horas_por_tecnico, 3,
-        t => `<td>👷 ${t.tecnicos_nombres || '—'}</td><td><strong>${parseFloat(t.horas_totales).toFixed(1)} h</strong></td><td>${fmt(t.coste_mo || 0)}</td>`,
+        t => `<td>👷 ${escapeHTML(t.tecnicos_nombres || '—')}</td><td><strong>${parseFloat(t.horas_totales).toFixed(1)} h</strong></td><td>${fmt(t.coste_mo || 0)}</td>`,
         detalleTecnico
     );
 
     renderTabla('tablaClientesIngresos', data.clientes_ingresos, 3,
-        c => `<td>${c.cliente}</td><td style="text-align:center;">${c.num_facturas}</td><td><strong>${fmt(c.total_facturado)}</strong></td>`,
+        c => `<td>${escapeHTML(c.cliente)}</td><td style="text-align:center;">${c.num_facturas}</td><td><strong>${fmt(c.total_facturado)}</strong></td>`,
         detalleClienteIngresos
     );
 
     renderTabla('tablaClientesMateriales', data.clientes_materiales, 3,
-        c => `<td>${c.cliente}</td><td style="text-align:center;">${c.num_ots}</td><td><strong>${fmt(c.total_materiales)}</strong></td>`,
+        c => `<td>${escapeHTML(c.cliente)}</td><td style="text-align:center;">${c.num_ots}</td><td><strong>${fmt(c.total_materiales)}</strong></td>`,
         detalleClienteMateriales
     );
 
     renderTabla('tablaClientesOTs', data.clientes_ots, 3,
-        c => `<td>${c.cliente}</td><td style="text-align:center;">${c.num_ots}</td><td style="text-align:center;">${c.ots_hechas}</td>`,
+        c => `<td>${escapeHTML(c.cliente)}</td><td style="text-align:center;">${c.num_ots}</td><td style="text-align:center;">${c.ots_hechas}</td>`,
         detalleClienteOTs
     );
 

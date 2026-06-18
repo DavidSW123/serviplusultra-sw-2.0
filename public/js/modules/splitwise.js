@@ -26,15 +26,15 @@ function abrirGastosSocios() {
                     const receptor = g.implicados || 'Alguien';
                     div.innerHTML += `<div class="gasto-item pago-directo">
                         <div><strong>💸 Devolución / Puesta al día</strong><br>
-                        <small style="color:#7f8c8d;">${g.pagador} ➡️ devolvió a ➡️ ${receptor} | ${g.fecha}</small></div>
+                        <small style="color:#7f8c8d;">${escapeHTML(g.pagador)} ➡️ devolvió a ➡️ ${escapeHTML(receptor)} | ${escapeHTML(g.fecha)}</small></div>
                         <div style="text-align:right;"><strong>${g.importe.toFixed(2)} €</strong><br>
                         <button class="btn-peligro" style="padding:2px 5px; font-size:0.8em; margin-top:5px;" onclick="borrarGastoSocio(${g.id})">Borrar</button></div>
                     </div>`;
                 } else {
                     const imp = g.implicados ? g.implicados.split(',').join(', ') : 'Todos';
                     div.innerHTML += `<div class="gasto-item">
-                        <div><strong>🛒 ${g.concepto}</strong><br>
-                        <small style="color:#7f8c8d;">Pagó: ${g.pagador} | Reparto: ${imp} | ${g.fecha}</small></div>
+                        <div><strong>🛒 ${escapeHTML(g.concepto)}</strong><br>
+                        <small style="color:#7f8c8d;">Pagó: ${escapeHTML(g.pagador)} | Reparto: ${escapeHTML(imp)} | ${escapeHTML(g.fecha)}</small></div>
                         <div style="text-align:right;"><strong>${g.importe.toFixed(2)} €</strong><br>
                         <button class="btn-peligro" style="padding:2px 5px; font-size:0.8em; margin-top:5px;" onclick="borrarGastoSocio(${g.id})">Borrar</button></div>
                     </div>`;
@@ -61,20 +61,20 @@ function renderizarDeudas(gastos) {
             const receptor = implicados[0];
             if (balances[pagador]  !== undefined) balances[pagador]  += importe;
             if (balances[receptor] !== undefined) balances[receptor] -= importe;
-            if (desglose[pagador])  desglose[pagador].push(`<div class="linea-desglose"><span style="color:#3498db">💸 Devolviste ${importe.toFixed(2)}€</span> a ${receptor}.</div>`);
-            if (desglose[receptor]) desglose[receptor].push(`<div class="linea-desglose"><span style="color:#3498db">📥 Recibiste ${importe.toFixed(2)}€</span> de ${pagador}.</div>`);
+            if (desglose[pagador])  desglose[pagador].push(`<div class="linea-desglose"><span style="color:#3498db">💸 Devolviste ${importe.toFixed(2)}€</span> a ${escapeHTML(receptor)}.</div>`);
+            if (desglose[receptor]) desglose[receptor].push(`<div class="linea-desglose"><span style="color:#3498db">📥 Recibiste ${importe.toFixed(2)}€</span> de ${escapeHTML(pagador)}.</div>`);
         } else {
             const cuota = importe / implicados.length;
             if (balances[pagador] !== undefined) {
                 balances[pagador] += importe;
-                desglose[pagador].push(`<div class="linea-desglose"><span style="color:#27ae60">🛒 Pagaste ${importe.toFixed(2)}€</span> por: ${g.concepto}</div>`);
+                desglose[pagador].push(`<div class="linea-desglose"><span style="color:#27ae60">🛒 Pagaste ${importe.toFixed(2)}€</span> por: ${escapeHTML(g.concepto)}</div>`);
             }
             implicados.forEach(imp => {
                 const name = imp.trim();
                 if (balances[name] !== undefined) {
                     balances[name] -= cuota;
-                    if (name !== pagador) desglose[name].push(`<div class="linea-desglose"><span style="color:#e74c3c">➖ Tu parte (-${cuota.toFixed(2)}€)</span> en: ${g.concepto} (Lo pagó ${pagador})</div>`);
-                    else                 desglose[name].push(`<div class="linea-desglose"><span style="color:#7f8c8d">➖ Tu propia parte (-${cuota.toFixed(2)}€)</span> en: ${g.concepto}</div>`);
+                    if (name !== pagador) desglose[name].push(`<div class="linea-desglose"><span style="color:#e74c3c">➖ Tu parte (-${cuota.toFixed(2)}€)</span> en: ${escapeHTML(g.concepto)} (Lo pagó ${escapeHTML(pagador)})</div>`);
+                    else                 desglose[name].push(`<div class="linea-desglose"><span style="color:#7f8c8d">➖ Tu propia parte (-${cuota.toFixed(2)}€)</span> en: ${escapeHTML(g.concepto)}</div>`);
                 }
             });
         }
