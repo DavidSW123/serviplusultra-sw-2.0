@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restablecer contraseña - ServiPlusUltra</title>
+    <link rel="stylesheet" href="/css/login.css">
+    <style>
+        .pass-wrap { position: relative; }
+        .pass-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.2em; color: #7f8c8d; padding: 4px 8px; }
+        .msg-ok  { background: #eafaf1; color: #1e8449; padding: 10px; border-radius: 6px; margin-bottom: 12px; }
+        .msg-err { background: #fdedec; color: #c0392b; padding: 10px; border-radius: 6px; margin-bottom: 12px; }
+        .hint { color: #7f8c8d; font-size: 0.85em; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h1>🔑 Nueva contraseña</h1>
+        <div id="msg"></div>
+        <p class="hint">Introduce la nueva contraseña para esta cuenta (mínimo 6 caracteres).</p>
+        <form id="formReset">
+            <div class="pass-wrap">
+                <input type="password" id="pass1" placeholder="Nueva contraseña" required>
+                <button type="button" class="pass-toggle" id="togglePass" title="Mostrar/ocultar">👁️</button>
+            </div>
+            <input type="password" id="pass2" placeholder="Repite la contraseña" required>
+            <button type="submit" id="btnReset">Guardar contraseña</button>
+        </form>
+        <p style="text-align:center; margin-top:14px;"><a href="/login" style="color:#3498db; font-size:0.9em;">Volver al inicio de sesión</a></p>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const token  = params.get('token') || '';
+        const msg    = document.getElementById('msg');
+
+        if (!token) {
+            msg.innerHTML = '<div class="msg-err">Enlace no válido (falta el token).</div>';
+            document.getElementById('formReset').style.display = 'none';
+        }
+
+        document.getElementById('togglePass').addEventListener('click', function() {
+            const i = document.getElementById('pass1');
+            if (i.type === 'password') { i.type = 'text';  this.innerText = '🙈'; }
+            else                        { i.type = 'password'; this.innerText = '👁️'; }
+        });
+
+        document.getElementById('formReset').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            msg.innerHTML = '';
+            const p1 = document.getElementById('pass1').value;
+            const p2 = document.getElementById('pass2').value;
+            if (p1 !== p2) { msg.innerHTML = '<div class="msg-err">Las contraseñas no coinciden.</div>'; return; }
+            if (p1.length < 6) { msg.innerHTML = '<div class="msg-err">Mínimo 6 caracteres.</div>'; return; }
+            const btn = document.getElementById('btnReset');
+            btn.disabled = true;
+            try {
+                const r = await fetch('/api/reset-password', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ token, newPass: p1 })
+                }).then(r => r.json());
+                if (r.ok) {
+                    msg.innerHTML = '<div class="msg-ok">✅ ' + r.mensaje + '</div>';
+                    document.getElementById('formReset').style.display = 'none';
+                    setTimeout(() => window.location.href = '/login', 2500);
+                } else {
+                    msg.innerHTML = '<div class="msg-err">❌ ' + (r.error || 'Error') + '</div>';
+                    btn.disabled = false;
+                }
+            } catch (_) {
+                msg.innerHTML = '<div class="msg-err">❌ Error de conexión.</div>';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

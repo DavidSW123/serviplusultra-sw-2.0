@@ -23,6 +23,7 @@ router.post  ('/login',               usuariosController.login);
 router.post  ('/logout',              usuariosController.logout);
 router.get   ('/me',                  autenticado, usuariosController.me);
 router.post  ('/recuperar-password',  usuariosController.recuperarPassword);
+router.post  ('/reset-password',      usuariosController.resetPassword);
 router.put   ('/usuarios/foto',       autenticado, usuariosController.actualizarFoto);
 router.put   ('/usuarios/password',   autenticado, usuariosController.cambiarPassword);
 router.post  ('/usuarios/tecnico',    adminODirector, usuariosController.crearTecnico);

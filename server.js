@@ -46,6 +46,7 @@ const limitadorAuth = rateLimit({
 
 app.use('/api/login',              limitadorAuth);
 app.use('/api/recuperar-password', limitadorAuth);
+app.use('/api/reset-password',     limitadorAuth);
 app.use('/api',                    limitadorGlobal);
 
 // ── Rutas API ──────────────────────────────────────────────────
@@ -58,6 +59,7 @@ app.get('/contabilidad',  (_req, res) => res.sendFile(path.join(__dirname, 'publ
 app.get('/presupuestos',  (_req, res) => res.sendFile(path.join(__dirname, 'public', 'presupuestos.html')));
 app.get('/bbdd',          (_req, res) => res.sendFile(path.join(__dirname, 'public', 'bbdd.html')));
 app.get('/login',         (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/reset-password',(_req, res) => res.sendFile(path.join(__dirname, 'public', 'reset.html')));
 
 // ── 404 para API no encontrada ─────────────────────────────────
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint no encontrado.' }));

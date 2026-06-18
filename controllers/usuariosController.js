@@ -2,7 +2,10 @@ const { db } = require('../config/db');
 const { errorServidor } = require('../utils/responder');
 const jwt    = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { JWT_SECRET } = require('../config/env');
+const crypto = require('crypto');
+const { JWT_SECRET, APP_ORIGIN, GOOGLE_SCRIPT_URL } = require('../config/env');
+
+const EMAIL_EMPRESA = 'serviplusultrasolutionssl@gmail.com';
 
 const BCRYPT_ROUNDS = 12;
 /** ¿El valor guardado ya es un hash bcrypt? */
@@ -171,64 +174,47 @@ async function getNombres(req, res) {
 /**
  * POST /api/recuperar-password
  * Body: { username }
- * Genera una contraseña temporal y la envía al email de la empresa.
- * Público — no requiere autenticación (es el flujo de "olvidé mi contraseña").
+ * Genera un enlace de un solo uso (token) y lo envía al correo de la empresa.
+ * NO cambia la contraseña; el admin abre el enlace y fija la nueva.
+ * Respuesta SIEMPRE genérica (anti-enumeración). Público.
  */
 async function recuperarPassword(req, res) {
+    const GENERICO = { ok: true, mensaje: 'Si el usuario existe, se ha enviado un enlace de restablecimiento al correo de la empresa.' };
     try {
-        const { username } = req.body;
-        if (!username || !username.trim()) {
-            return res.status(400).json({ error: 'Indica un nombre de usuario.' });
-        }
+        const username = (req.body.username || '').trim();
+        if (!username) return res.json(GENERICO);
 
-        // Verificar que el usuario existe
-        const check = await db.execute({
-            sql:  `SELECT username FROM usuarios WHERE username = ?`,
-            args: [username.trim()]
-        });
-        if (check.rows.length === 0) {
-            return res.status(404).json({ error: 'Usuario no encontrado.' });
-        }
+        const check = await db.execute({ sql: `SELECT id FROM usuarios WHERE username = ?`, args: [username] });
+        if (check.rows.length === 0) return res.json(GENERICO); // no revelar si existe
 
-        // Generar contraseña temporal (12 chars, sin caracteres confusos)
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-        let tempPass = '';
-        for (let i = 0; i < 12; i++) tempPass += chars[Math.floor(Math.random() * chars.length)];
-
-        // Actualizar BBDD (se guarda hasheada; el email lleva la temporal en claro)
-        const hashTemp = await bcrypt.hash(tempPass, BCRYPT_ROUNDS);
+        // Token de un solo uso: se guarda solo su hash; caduca en 1 hora.
+        const token     = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const expira    = new Date(Date.now() + 60 * 60 * 1000).toISOString();
         await db.execute({
-            sql:  `UPDATE usuarios SET password = ? WHERE username = ?`,
-            args: [hashTemp, username.trim()]
+            sql:  `UPDATE usuarios SET reset_token_hash = ?, reset_token_expira = ? WHERE id = ?`,
+            args: [tokenHash, expira, check.rows[0].id]
         });
 
-        // Enviar email al correo corporativo
-        const { GOOGLE_SCRIPT_URL } = require('../config/env');
-        const emailEmpresa = 'serviplusultrasolutionssl@gmail.com';
-
+        const enlace = `${APP_ORIGIN}/reset-password?token=${token}`;
         try {
             await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    to:      emailEmpresa,
-                    subject: `🔑 Recuperación de contraseña — ${username}`,
+                    to:      EMAIL_EMPRESA,
+                    subject: `🔑 Restablecer contraseña — ${username}`,
                     html: `
-                        <div style="font-family:Arial; padding:20px; max-width:500px;">
-                            <h2 style="color:#2c3e50;">Recuperación de contraseña — ServiPlusUltra</h2>
-                            <p>Se ha solicitado un restablecimiento de contraseña para el usuario:</p>
-                            <p style="background:#f4f6f7; padding:10px; border-radius:6px;">
-                                <strong>Usuario:</strong> ${username}
+                        <div style="font-family:Arial; padding:20px; max-width:520px;">
+                            <h2 style="color:#2c3e50;">Restablecer contraseña — ServiPlusUltra</h2>
+                            <p>Se ha solicitado restablecer la contraseña del usuario <strong>${username}</strong>.</p>
+                            <p>Pulsa el botón para fijar una nueva contraseña (enlace válido 1 hora, un solo uso):</p>
+                            <p style="text-align:center; margin:24px 0;">
+                                <a href="${enlace}" style="background:#1abc9c; color:#fff; padding:12px 22px; border-radius:6px; text-decoration:none; font-weight:bold;">Establecer nueva contraseña</a>
                             </p>
-                            <p>Esta es la nueva contraseña temporal:</p>
-                            <p style="background:#fffbe6; padding:15px; border-radius:6px; font-family:monospace; font-size:1.3em; text-align:center; letter-spacing:2px; border:2px dashed #f39c12;">
-                                <strong>${tempPass}</strong>
-                            </p>
-                            <p style="color:#7f8c8d; font-size:0.9em;">
-                                <strong>Importante:</strong> al iniciar sesión, cambia esta contraseña por una propia desde tu perfil.<br>
-                                Si no has solicitado este cambio, contacta inmediatamente con el administrador.
-                            </p>
-                            <p style="color:#95a5a6; font-size:0.8em; margin-top:30px;">
+                            <p style="color:#7f8c8d; font-size:0.85em;">Si el botón no funciona, copia este enlace:<br><span style="word-break:break-all;">${enlace}</span></p>
+                            <p style="color:#95a5a6; font-size:0.8em; margin-top:24px;">
+                                Si no has solicitado este cambio, ignora este correo.<br>
                                 Solicitud realizada el ${new Date().toLocaleString('es-ES')}.
                             </p>
                         </div>
@@ -236,15 +222,48 @@ async function recuperarPassword(req, res) {
                 })
             });
         } catch (mailErr) {
-            // El password se ha cambiado igualmente. Logueamos el error pero no rompemos el flujo.
             console.error('Error enviando email de recuperación:', mailErr.message);
-            return res.status(500).json({ error: 'Contraseña reseteada pero falló el envío del email. Contacta con el administrador.' });
+            // No revelamos el fallo al cliente (anti-enumeración); el token queda guardado.
         }
 
-        res.json({ ok: true, mensaje: 'Contraseña temporal enviada al correo de la empresa.' });
+        return res.json(GENERICO);
     } catch (e) {
         errorServidor(res, e);
     }
 }
 
-module.exports = { login, logout, me, actualizarFoto, cambiarPassword, crearTecnico, getNombres, recuperarPassword };
+/**
+ * POST /api/reset-password
+ * Body: { token, newPass }
+ * Valida el token de un solo uso y fija la nueva contraseña (hasheada). Público.
+ */
+async function resetPassword(req, res) {
+    try {
+        const { token, newPass } = req.body;
+        if (!token || !newPass) return res.status(400).json({ error: 'Faltan datos.' });
+        if (String(newPass).length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+
+        const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
+        const r = await db.execute({
+            sql:  `SELECT id, reset_token_expira FROM usuarios WHERE reset_token_hash = ?`,
+            args: [tokenHash]
+        });
+        if (r.rows.length === 0) return res.status(400).json({ error: 'Enlace inválido o ya utilizado.' });
+
+        const user = r.rows[0];
+        if (!user.reset_token_expira || new Date(user.reset_token_expira) < new Date()) {
+            return res.status(400).json({ error: 'El enlace ha caducado. Solicita uno nuevo.' });
+        }
+
+        const hash = await bcrypt.hash(newPass, BCRYPT_ROUNDS);
+        await db.execute({
+            sql:  `UPDATE usuarios SET password = ?, reset_token_hash = NULL, reset_token_expira = NULL WHERE id = ?`,
+            args: [hash, user.id]
+        });
+        res.json({ ok: true, mensaje: 'Contraseña actualizada. Ya puedes iniciar sesión.' });
+    } catch (e) {
+        errorServidor(res, e);
+    }
+}
+
+module.exports = { login, logout, me, actualizarFoto, cambiarPassword, crearTecnico, getNombres, recuperarPassword, resetPassword };
