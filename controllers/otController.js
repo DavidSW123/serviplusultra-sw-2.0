@@ -41,7 +41,7 @@ async function _insertarMateriales(otId, lineas) {
 async function getAll(req, res) {
     try {
         const result = await db.execute(
-            `SELECT ot.*, f.id AS factura_id, f.numero_factura, f.fecha_emision AS factura_fecha_emision, f.lineas AS factura_lineas, f.emails_enviados AS factura_emails_enviados, f.qr_data AS factura_qr, f.rectificada_por_id AS factura_rectificada_por_id, fr.numero_factura AS factura_rectificativa_numero,
+            `SELECT ot.*, f.id AS factura_id, f.numero_factura, f.estado AS factura_estado, f.fecha_emision AS factura_fecha_emision, f.lineas AS factura_lineas, f.emails_enviados AS factura_emails_enviados, f.qr_data AS factura_qr, f.rectificada_por_id AS factura_rectificada_por_id, fr.numero_factura AS factura_rectificativa_numero,
                 fant.id AS factura_anterior_id, fant.numero_factura AS factura_anterior_numero, fr2.numero_factura AS factura_anterior_rectificativa,
                 f.eliminacion_pendiente AS factura_eliminacion_pendiente
              FROM ordenes_trabajo ot
@@ -49,6 +49,7 @@ async function getAll(req, res) {
                  SELECT id FROM facturas
                  WHERE ot_id = ot.id
                    AND COALESCE(es_rectificativa, 0) = 0
+                   AND COALESCE(estado, 'EMITIDA') <> 'ANULADA'
                  ORDER BY CASE WHEN rectificada_por_id IS NULL THEN 0 ELSE 1 END, id DESC
                  LIMIT 1
              )
@@ -235,13 +236,14 @@ async function eliminar(req, res) {
     }
 
     try {
-        // Si hay factura protegida (enviada al cliente), no se borra:
-        // se marca como eliminacion_pendiente para que un admin la apruebe.
+        // Una factura EMITIDA es inmutable: no se borra (se anula por rectificativa).
+        // Los BORRADORES sí se pueden borrar (no consumen número fiscal).
         const { rows: facts } = await db.execute({
-            sql:  `SELECT id, emails_enviados FROM facturas WHERE ot_id = ?`,
+            sql:  `SELECT id, emails_enviados, estado, es_rectificativa FROM facturas WHERE ot_id = ?`,
             args: [id]
         });
         const protegidas = facts.filter(f => {
+            if (f.estado === 'EMITIDA' && !f.es_rectificativa) return true;
             let envios = [];
             try { envios = JSON.parse(f.emails_enviados || '[]'); } catch (_) {}
             return Array.isArray(envios) && envios.length > 0;

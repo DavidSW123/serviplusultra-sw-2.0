@@ -99,33 +99,70 @@ async function generarNumeroFactura() {
     return `${seqStr}-${year}${mm}${dd}`;
 }
 
+/** Devuelve la factura ACTIVA de una OT (borrador o emitida; nunca anulada/rectificativa). */
+async function _facturaActiva(ot_id) {
+    const r = await db.execute({
+        sql:  `SELECT * FROM facturas
+               WHERE ot_id = ?
+                 AND COALESCE(es_rectificativa, 0) = 0
+                 AND COALESCE(estado, 'EMITIDA') <> 'ANULADA'
+                 AND rectificada_por_id IS NULL
+               ORDER BY id DESC LIMIT 1`,
+        args: [ot_id]
+    });
+    return r.rows[0] || null;
+}
+
+/**
+ * POST /api/factura/borrador
+ * Body: { ot_id, base_imponible, iva, total, lineas }
+ * Crea o actualiza el BORRADOR de la OT. NO asigna número fiscal.
+ */
+async function guardarBorrador(req, res) {
+    const { ot_id, base_imponible, iva, total, lineas } = req.body;
+    try {
+        const activa = await _facturaActiva(ot_id);
+        if (activa && activa.estado === 'EMITIDA') {
+            return res.status(400).json({ error: 'Esta OT ya tiene una factura EMITIDA. Para cambiarla, emite una rectificativa.' });
+        }
+        const lineasJSON = JSON.stringify(lineas || []);
+        if (activa && activa.estado === 'BORRADOR') {
+            await db.execute({
+                sql:  `UPDATE facturas SET base_imponible=?, iva=?, total=?, lineas=? WHERE id=?`,
+                args: [base_imponible, iva, total, lineasJSON, activa.id]
+            });
+            return res.json({ ok: true, estado: 'BORRADOR', factura_id: activa.id });
+        }
+        const r = await db.execute({
+            sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, lineas, estado)
+                   VALUES (?, ?, ?, ?, ?, 'BORRADOR')`,
+            args: [ot_id, base_imponible, iva, total, lineasJSON]
+        });
+        res.json({ ok: true, estado: 'BORRADOR', factura_id: Number(r.lastInsertRowid) });
+    } catch (e) {
+        errorServidor(res, e, 'guardarBorrador');
+    }
+}
+
 /**
  * POST /api/factura
- * Body: { ot_id, codigo_ot, base_imponible, iva, total }
- * Si ya existe una factura para este ot_id, devuelve la existente (inmutable).
- * Si no, genera número secuencial, guarda y devuelve.
+ * Body: { ot_id, base_imponible, iva, total, lineas }
+ * EMITE la factura de la OT: asigna número correlativo y la congela (estado EMITIDA).
+ * Si ya hay una EMITIDA activa → idempotente (la devuelve).
+ * Si hay un BORRADOR → lo convierte en EMITIDA.
  */
 async function emitir(req, res) {
-    const { ot_id, codigo_ot, base_imponible, iva, total } = req.body;
+    const { ot_id, base_imponible, iva, total, lineas } = req.body;
 
     try {
-        // Factura ACTIVA (regular y no rectificada) → idempotente.
-        // Si la original fue rectificada se permite emitir una nueva con el siguiente correlativo.
-        const existing = await db.execute({
-            sql:  `SELECT * FROM facturas
-                   WHERE ot_id = ?
-                     AND COALESCE(es_rectificativa, 0) = 0
-                     AND rectificada_por_id IS NULL
-                   ORDER BY id DESC LIMIT 1`,
-            args: [ot_id]
-        });
-        if (existing.rows.length > 0) {
-            const f = existing.rows[0];
+        const activa = await _facturaActiva(ot_id);
+        if (activa && activa.estado === 'EMITIDA') {
             return res.json({
                 mensaje:        'Factura ya registrada',
-                qr_data:        f.qr_data,
-                numero_factura: f.numero_factura,
-                fecha_emision:  f.fecha_emision
+                qr_data:        activa.qr_data,
+                numero_factura: activa.numero_factura,
+                fecha_emision:  activa.fecha_emision,
+                estado:         'EMITIDA'
             });
         }
 
@@ -133,14 +170,25 @@ async function emitir(req, res) {
         const numero_factura = await generarNumeroFactura();
         const textoQR        = `NIF:B26892760|Factura:${numero_factura}|Fecha:${fecha}|Total:${total}EUR`;
         const qr             = await QRCode.toDataURL(textoQR);
+        const lineasJSON     = JSON.stringify(lineas || (activa ? JSON.parse(activa.lineas || '[]') : []));
+        const ahora          = new Date().toISOString();
 
-        await db.execute({
-            sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            args: [ot_id, base_imponible, iva, total, qr, fecha, numero_factura]
-        });
+        if (activa && activa.estado === 'BORRADOR') {
+            // Emitir el borrador existente
+            await db.execute({
+                sql:  `UPDATE facturas SET estado='EMITIDA', numero_factura=?, fecha_emision=?, emitida_en=?, qr_data=?, base_imponible=?, iva=?, total=?, lineas=? WHERE id=?`,
+                args: [numero_factura, fecha, ahora, qr, base_imponible, iva, total, lineasJSON, activa.id]
+            });
+        } else {
+            // Crear directamente como EMITIDA
+            await db.execute({
+                sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura, lineas, estado, emitida_en)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'EMITIDA', ?)`,
+                args: [ot_id, base_imponible, iva, total, qr, fecha, numero_factura, lineasJSON, ahora]
+            });
+        }
 
-        res.json({ mensaje: 'Factura emitida', qr_data: qr, numero_factura, fecha_emision: fecha });
+        res.json({ mensaje: 'Factura emitida', qr_data: qr, numero_factura, fecha_emision: fecha, estado: 'EMITIDA' });
     } catch (e) {
         errorServidor(res, e, 'emitir');
     }
@@ -219,16 +267,19 @@ async function testEmail(req, res) {
 async function actualizarLineas(req, res) {
     const { ot_id, factura_id, lineas } = req.body;
     try {
+        const lineasJSON = JSON.stringify(lineas || []);
         if (factura_id) {
-            await db.execute({
-                sql:  `UPDATE facturas SET lineas=? WHERE id=?`,
-                args: [JSON.stringify(lineas || []), factura_id]
-            });
+            // Una factura regular EMITIDA es inmutable (solo se corrige por rectificativa).
+            const f = await db.execute({ sql: `SELECT estado, es_rectificativa FROM facturas WHERE id=?`, args: [factura_id] });
+            if (f.rows[0] && f.rows[0].estado === 'EMITIDA' && !f.rows[0].es_rectificativa) {
+                return res.status(400).json({ error: 'No se puede modificar una factura emitida. Emite una rectificativa.' });
+            }
+            await db.execute({ sql: `UPDATE facturas SET lineas=? WHERE id=?`, args: [lineasJSON, factura_id] });
         } else {
-            // Actualiza la regular (no rectificativa) por ot_id
+            // Solo el BORRADOR activo de la OT
             await db.execute({
-                sql:  `UPDATE facturas SET lineas=? WHERE ot_id=? AND COALESCE(es_rectificativa,0)=0`,
-                args: [JSON.stringify(lineas || []), ot_id]
+                sql:  `UPDATE facturas SET lineas=? WHERE ot_id=? AND COALESCE(es_rectificativa,0)=0 AND COALESCE(estado,'EMITIDA')='BORRADOR'`,
+                args: [lineasJSON, ot_id]
             });
         }
         res.json({ ok: true });
@@ -263,9 +314,9 @@ async function emitirDesdePresupuesto(req, res) {
         const textoQR = `NIF:B26892760|Factura:${numero_factura}|Fecha:${fecha}|Total:${total}EUR`;
         const qr = await QRCode.toDataURL(textoQR);
         await db.execute({
-            sql:  `INSERT INTO facturas (presupuesto_id, base_imponible, iva, total, fecha_emision, numero_factura, lineas, qr_data)
-                   VALUES (?,?,?,?,?,?,?,?)`,
-            args: [presupuesto_id, base_imponible, iva, total, fecha, numero_factura, JSON.stringify(lineas || []), qr]
+            sql:  `INSERT INTO facturas (presupuesto_id, base_imponible, iva, total, fecha_emision, numero_factura, lineas, qr_data, estado, emitida_en)
+                   VALUES (?,?,?,?,?,?,?,?, 'EMITIDA', ?)`,
+            args: [presupuesto_id, base_imponible, iva, total, fecha, numero_factura, JSON.stringify(lineas || []), qr, new Date().toISOString()]
         });
 
         const campoTotal = tipo === 'proforma' ? ', proforma_total=?' : '';
@@ -361,19 +412,19 @@ async function rectificar(req, res) {
         const r = await db.execute({
             sql:  `INSERT INTO facturas
                    (ot_id, presupuesto_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura, lineas,
-                    es_rectificativa, factura_rectificada_id, motivo_rectificacion)
-                   VALUES (?,?,?,?,?,?,?,?,?,1,?,?)`,
+                    es_rectificativa, factura_rectificada_id, motivo_rectificacion, estado, emitida_en)
+                   VALUES (?,?,?,?,?,?,?,?,?,1,?,?, 'EMITIDA', ?)`,
             args: [
                 orig.ot_id, orig.presupuesto_id,
                 base_imponible, iva, total, qr, fecha, numeroR,
                 JSON.stringify(lineas || []),
-                orig.id, motivo || ''
+                orig.id, motivo || '', new Date().toISOString()
             ]
         });
 
         const newId = Number(r.lastInsertRowid);
         await db.execute({
-            sql:  `UPDATE facturas SET rectificada_por_id=? WHERE id=?`,
+            sql:  `UPDATE facturas SET rectificada_por_id=?, estado='ANULADA' WHERE id=?`,
             args: [newId, orig.id]
         });
 
@@ -542,4 +593,4 @@ async function reasignarNumero(req, res) {
     }
 }
 
-module.exports = { emitir, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero };
+module.exports = { emitir, guardarBorrador, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero };

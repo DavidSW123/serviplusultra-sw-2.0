@@ -98,65 +98,54 @@ async function abrirGeneradorFactura(id) {
         _construirLineasDesdeOT(ot);
     }
 
+    // Limpiar badges/avisos dinámicos previos (antes de re-render)
+    ['tagEstadoFact','tagRectificada','tagHistorial','badgePendienteElim'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.remove();
+    });
+    const avisoPrev = document.getElementById('avisoEstadoFact'); if (avisoPrev) avisoPrev.remove();
+
     renderizarTablaFactura();
     _renderBadgeEnviada(ot.factura_emails_enviados);
     _renderQRFactura(ot.factura_qr);
     _renderBadgePendienteElim(ot.factura_eliminacion_pendiente);
-    window._facturaActualId = ot.factura_id || null;
+    window._facturaActualId   = ot.factura_id || null;
+    window._modoRectificativa = false;
 
-    // Limpiar TODAS las badges dinámicas previas
-    ['tagRectificada','tagHistorial','badgePendienteElim'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.remove();
-    });
-
-    // Restablecer botones por defecto
+    // Botones del modal
     const btnRect    = document.getElementById('btnRectificarFact');
     const btnGuardar = document.querySelector('#modalFactura [onclick="guardarCambiosFactura()"]');
+    const btnEmitir  = document.getElementById('btnEmitirFact');
     const btnEmail   = document.querySelector('#modalFactura [onclick="enviarFacturaAlCliente()"]');
     const btnPDF     = document.querySelector('#modalFactura [onclick="descargarFacturaPDF()"]');
-    if (btnGuardar) { btnGuardar.innerText = '💾 Guardar Cambios'; btnGuardar.style.display = ''; btnGuardar.style.backgroundColor = ''; btnGuardar.style.color = ''; }
-    if (btnEmail)   btnEmail.style.display = '';
-    if (btnPDF)     btnPDF.style.display = '';
-    if (btnRect)    btnRect.style.display = '';
-    const avisoPrev = document.getElementById('avisoRefactura');
-    if (avisoPrev) avisoPrev.remove();
-    window._modoRefactura = false;
+    [btnRect, btnGuardar, btnEmitir, btnEmail, btnPDF].forEach(b => { if (b) b.style.display = ''; });
+    if (btnGuardar) { btnGuardar.innerText = '💾 Guardar borrador'; btnGuardar.style.backgroundColor = ''; btnGuardar.style.color = ''; }
 
-    if (ot.factura_rectificada_por_id) {
-        // Factura anulada por su rectificativa. Reutilizamos el botón principal como "Emitir Refactura".
-        if (btnRect)  btnRect.style.display = 'none';
-        if (btnEmail) btnEmail.style.display = 'none';
-        if (btnGuardar) {
-            btnGuardar.style.display = '';
-            btnGuardar.innerText = '📄 Emitir Refactura';
-            btnGuardar.style.backgroundColor = '#3498db';
-            btnGuardar.style.color = '#fff';
-        }
-        window._modoRefactura = true;
+    const estado = ot.factura_estado || (ot.numero_factura ? 'EMITIDA' : 'BORRADOR');
+    const wrap   = document.getElementById('factBadgesWrap');
 
-        const wrap = document.getElementById('factBadgesWrap');
-        if (wrap) {
-            const rectId = ot.factura_rectificada_por_id;
-            wrap.insertAdjacentHTML('beforeend',
-                `<span id="tagRectificada" class="fact-pill fact-pill-orange" onclick="verRectificativa(${rectId})" title="Click para ver la rectificativa">📝 Rectificada por ${escapeHTML(ot.factura_rectificativa_numero || '')} →</span>`);
-        }
-        const factHeader = document.querySelector('.datos-factura');
-        if (factHeader) {
-            factHeader.insertAdjacentHTML('beforeend',
-                `<div id="avisoRefactura" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">Esta factura está <strong>anulada</strong> por la rectificativa. Si la anulación es solo un abono, no necesita más acción. Si necesitas emitir una nueva factura, pulsa <em>📄 Emitir Refactura</em>.</div>`);
-        }
+    if (estado === 'EMITIDA') {
+        // Factura definitiva: congelada. Solo PDF, enviar y rectificar.
+        if (btnGuardar) btnGuardar.style.display = 'none';
+        if (btnEmitir)  btnEmitir.style.display = 'none';
+        if (wrap) wrap.insertAdjacentHTML('beforeend',
+            `<span id="tagEstadoFact" class="fact-pill fact-pill-green fact-pill-static" title="Factura definitiva e inmutable">✅ EMITIDA</span>`);
     } else {
-
-        const prevHist = document.getElementById('tagHistorial');
-        if (prevHist) prevHist.remove();
-        if (ot.factura_anterior_id) {
-            const wrap = document.getElementById('factBadgesWrap');
-            if (wrap) {
-                wrap.insertAdjacentHTML('beforeend',
-                    `<span id="tagHistorial" class="fact-pill fact-pill-blue" onclick="abrirFacturaAnterior(${ot.factura_anterior_id})" title="Click para ver la factura anterior rectificada">📜 Refactura de ${escapeHTML(ot.factura_anterior_numero)}${ot.factura_anterior_rectificativa ? ' (rect. ' + escapeHTML(ot.factura_anterior_rectificativa) + ')' : ''} →</span>`);
-            }
-        }
+        // BORRADOR (o aún sin factura): editable. Guardar borrador + Emitir. Sin email/rectificar.
+        if (btnEmail) btnEmail.style.display = 'none';
+        if (btnRect)  btnRect.style.display = 'none';
+        if (wrap) wrap.insertAdjacentHTML('beforeend',
+            `<span id="tagEstadoFact" class="fact-pill fact-pill-grey fact-pill-static" title="Borrador sin número fiscal">📝 BORRADOR</span>`);
+        const factHeader = document.querySelector('.datos-factura');
+        if (factHeader) factHeader.insertAdjacentHTML('beforeend',
+            `<div id="avisoEstadoFact" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">Borrador <strong>sin número fiscal</strong>. Edítalo libremente; pulsa <em>✅ Emitir factura</em> para asignarle número (quedará definitiva e inmutable).</div>`);
     }
+
+    // Si es una refactura (la OT tuvo una factura anterior rectificada), mostrar el origen
+    if (ot.factura_anterior_id && wrap) {
+        wrap.insertAdjacentHTML('beforeend',
+            `<span id="tagHistorial" class="fact-pill fact-pill-blue" onclick="abrirFacturaAnterior(${ot.factura_anterior_id})" title="Click para ver la factura anterior rectificada">📜 Refactura de ${escapeHTML(ot.factura_anterior_numero)}${ot.factura_anterior_rectificativa ? ' (rect. ' + escapeHTML(ot.factura_anterior_rectificativa) + ')' : ''} →</span>`);
+    }
+
     abrirModal('modalFactura');
 }
 
@@ -372,27 +361,29 @@ async function verRectificativa(facturaId) {
     renderizarTablaFactura();
     _renderBadgeEnviada(f.emails_enviados);
     _renderQRFactura(f.qr_data);
-    // Limpiar tag previa y añadir aviso de "es rectificativa de XX"
-    // Limpiar TODOS los badges dinámicos previos antes de pintar los de esta factura
-    ['tagRectificada','tagHistorial','badgePendienteElim'].forEach(id => {
+    // Limpiar badges/avisos dinámicos previos
+    ['tagEstadoFact','tagRectificada','tagHistorial','badgePendienteElim'].forEach(id => {
         const el = document.getElementById(id); if (el) el.remove();
     });
+    const avisoPrev = document.getElementById('avisoEstadoFact'); if (avisoPrev) avisoPrev.remove();
     const wrap = document.getElementById('factBadgesWrap');
     if (wrap) {
         if (f.es_rectificativa) {
-            // Es la propia rectificativa: muestra a qué original anula (estático, ya estás dentro)
             wrap.insertAdjacentHTML('beforeend',
                 `<span id="tagRectificada" class="fact-pill fact-pill-orange fact-pill-static" title="${(f.motivo_rectificacion || '').replace(/"/g,'&quot;')}">📝 Rectificativa de ${escapeHTML(f.rectifica_a_numero || '')}</span>`);
         } else if (f.rectificada_por_id) {
-            // Es la factura ORIGINAL rectificada: badge clickable que abre la rectificativa
             wrap.insertAdjacentHTML('beforeend',
                 `<span id="tagRectificada" class="fact-pill fact-pill-orange" onclick="verRectificativa(${f.rectificada_por_id})" title="Click para ver la rectificativa">📝 Rectificada por ${escapeHTML(f.rectificada_por_numero || '')} →</span>`);
         }
     }
 
-    // Ocultar botón "Emitir Rectificativa" (no se puede rectificar una rectificativa)
-    const btnRect = document.getElementById('btnRectificarFact');
-    if (btnRect) btnRect.style.display = 'none';
+    // Botones en modo rectificativa: una rectificativa es EMITIDA → sin "Emitir", sin "Rectificar".
+    const btnRect    = document.getElementById('btnRectificarFact');
+    const btnEmitir  = document.getElementById('btnEmitirFact');
+    const btnGuardar = document.querySelector('#modalFactura [onclick="guardarCambiosFactura()"]');
+    if (btnRect)   btnRect.style.display = 'none';
+    if (btnEmitir) btnEmitir.style.display = 'none';
+    if (btnGuardar) { btnGuardar.style.display = 'none'; }
 
     abrirModal('modalFactura');
 }
@@ -562,30 +553,55 @@ async function _emitirYRegistrar() {
     return data;
 }
 
-/** Guarda las líneas modificadas en la factura (crea la factura si no existe todavía). */
+/** Guarda como BORRADOR (sin asignar número fiscal). En rectificativa, guarda sus líneas. */
 async function guardarCambiosFactura() {
     try {
+        const base  = parseFloat(document.getElementById('factBase').innerText);
+        const iva   = parseFloat(document.getElementById('factIva').innerText);
+        const total = parseFloat(document.getElementById('factTotal').innerText);
+
         if (window._modoRectificativa) {
-            // Rectificativa: ya está emitida, solo actualizamos líneas
             await API.post('/api/factura/lineas', { factura_id: window._facturaActualId, lineas: lineasFactura });
-        } else {
-            await _emitirYRegistrar();
-            await API.post('/api/factura/lineas', { ot_id: otActualId, lineas: lineasFactura });
-            const frescas = await API.get('/api/ot');
-            if (Array.isArray(frescas)) otsGlobal = frescas;
+            alert('✅ Cambios guardados');
+            return;
         }
-        const numFact = document.getElementById('factNumero').innerText;
-        alert(`✅ Cambios guardados (${numFact})`);
+
+        const r = await API.post('/api/factura/borrador', {
+            ot_id: otActualId, base_imponible: base, iva, total, lineas: lineasFactura
+        });
+        if (r.error) { alert('❌ ' + r.error); return; }
+        window._facturaActualId = r.factura_id || window._facturaActualId;
+        const frescas = await API.get('/api/ot');
+        if (Array.isArray(frescas)) otsGlobal = frescas;
+        alert('💾 Borrador guardado (todavía sin número de factura).');
     } catch (e) {
         alert('❌ Error al guardar: ' + e.message);
     }
 }
 
+/** Emite la factura: asigna número correlativo y la congela (estado EMITIDA). */
+async function emitirFactura() {
+    if (!confirm('¿Emitir la factura?\n\nSe le asignará un número definitivo y quedará INMUTABLE: no se podrá editar ni borrar, solo corregir mediante una rectificativa (abono).')) return;
+    try {
+        const base  = parseFloat(document.getElementById('factBase').innerText);
+        const iva   = parseFloat(document.getElementById('factIva').innerText);
+        const total = parseFloat(document.getElementById('factTotal').innerText);
+        const data = await API.post('/api/factura', {
+            ot_id: otActualId, codigo_ot: otActualCodigo, base_imponible: base, iva, total, lineas: lineasFactura
+        });
+        if (data.error) { alert('❌ ' + data.error); return; }
+        const frescas = await API.get('/api/ot');
+        if (Array.isArray(frescas)) otsGlobal = frescas;
+        alert(`✅ Factura emitida: ${data.numero_factura}`);
+        // Reabrir en estado EMITIDA para reflejar el cambio (congelada)
+        if (otsGlobal.find(o => o.id === otActualId)) abrirGeneradorFactura(otActualId);
+    } catch (e) {
+        alert('❌ Error al emitir: ' + e.message);
+    }
+}
+
 /** Descarga el PDF de la factura sin cabeceras del navegador. */
 async function descargarFacturaPDF() {
-    if (!window._modoRectificativa) {
-        try { await _emitirYRegistrar(); } catch (e) { alert('❌ ' + e.message); return; }
-    }
 
     const numFactura = document.getElementById('factNumero').innerText;
     const area       = document.getElementById('facturaAreaImpresion');
