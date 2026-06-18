@@ -132,7 +132,14 @@ async function inicializarDB() {
             `ALTER TABLE facturas ADD COLUMN eliminacion_pendiente INTEGER DEFAULT 0`,
             // Recuperación de contraseña con token de un solo uso
             `ALTER TABLE usuarios ADD COLUMN reset_token_hash TEXT`,
-            `ALTER TABLE usuarios ADD COLUMN reset_token_expira TEXT`
+            `ALTER TABLE usuarios ADD COLUMN reset_token_expira TEXT`,
+            // Fase 1 — Estados de factura: BORRADOR / EMITIDA / ANULADA
+            `ALTER TABLE facturas ADD COLUMN estado TEXT`,
+            `ALTER TABLE facturas ADD COLUMN emitida_en TEXT`,
+            // Backfill idempotente: las facturas existentes ya estaban emitidas
+            `UPDATE facturas SET estado='EMITIDA' WHERE estado IS NULL AND numero_factura IS NOT NULL`,
+            `UPDATE facturas SET estado='BORRADOR' WHERE estado IS NULL AND numero_factura IS NULL`,
+            `UPDATE facturas SET estado='ANULADA' WHERE rectificada_por_id IS NOT NULL AND estado='EMITIDA'`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }
