@@ -263,15 +263,23 @@ async function emitir(req, res) {
  * Body: { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo }
  */
 async function enviarEmail(req, res) {
-    const { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo, ot_id, factura_id } = req.body;
+    const { emailDestino, asunto, htmlBody, pdfBase64, nombreArchivo, ot_id, factura_id, datos } = req.body;
     try {
+        // El PDF se genera en el SERVIDOR (pdfkit) si llegan los datos de la factura
+        // (fiable, nunca en blanco). Si no, se usa el pdfBase64 recibido (compatibilidad).
+        let adjunto = pdfBase64;
+        if (datos) {
+            try { adjunto = (await _pdfFacturaBuffer(datos)).toString('base64'); }
+            catch (e) { return errorServidor(res, e, 'enviarEmail/pdf'); }
+        }
+
         await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
             body: JSON.stringify({
                 to:            emailDestino,
                 subject:       asunto,
                 html:          htmlBody,
-                adjuntoBase64: pdfBase64,
+                adjuntoBase64: adjunto,
                 adjuntoNombre: nombreArchivo
             })
         });
