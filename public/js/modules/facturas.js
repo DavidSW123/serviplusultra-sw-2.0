@@ -633,9 +633,23 @@ async function emitirFactura() {
     }
 }
 
+/** Espera a que imágenes y fuentes del área estén listas antes de capturar (evita PDF en blanco). */
+function _esperarRecursosFactura(area) {
+    const imgs = [...area.querySelectorAll('img')];
+    const espImgs = imgs.map(img =>
+        (img.complete && img.naturalWidth > 0)
+            ? Promise.resolve()
+            : new Promise(res => { img.onload = res; img.onerror = res; })
+    );
+    const espFonts  = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+    const seguridad = new Promise(res => setTimeout(res, 3000)); // nunca colgar
+    return Promise.race([Promise.all([...espImgs, espFonts]), seguridad]);
+}
+
+const _OPC_HTML2CANVAS = { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false };
+
 /** Descarga el PDF de la factura sin cabeceras del navegador. */
 async function descargarFacturaPDF() {
-
     const numFactura = document.getElementById('factNumero').innerText;
     const area       = document.getElementById('facturaAreaImpresion');
     const noPrints   = document.querySelectorAll('.no-print');
@@ -644,17 +658,26 @@ async function descargarFacturaPDF() {
     noPrints.forEach(el => el.style.display = 'none');
     document.getElementById('printClienteNombre').style.display = 'block';
 
-    html2pdf().set({
-        margin:      10,
-        filename:    `Factura-${numFactura}.pdf`,
-        image:       { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(area).save().then(() => {
+    const _restaurar = () => {
         area.classList.remove('factura-pdf-limpia');
         noPrints.forEach(el => el.style.display = '');
         document.getElementById('printClienteNombre').style.display = 'none';
-    });
+    };
+
+    try {
+        await _esperarRecursosFactura(area);
+        await html2pdf().set({
+            margin:      10,
+            filename:    `Factura-${numFactura}.pdf`,
+            image:       { type: 'jpeg', quality: 0.98 },
+            html2canvas: _OPC_HTML2CANVAS,
+            jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(area).save();
+    } catch (e) {
+        alert('❌ No se pudo generar el PDF (' + (e && e.message ? e.message : e) + '). Inténtalo de nuevo; si persiste, prueba con otro navegador.');
+    } finally {
+        _restaurar();
+    }
 }
 
 async function enviarFacturaAlCliente() {
@@ -677,18 +700,31 @@ async function enviarFacturaAlCliente() {
     noPrints.forEach(el => el.style.display = 'none');
     document.getElementById('printClienteNombre').style.display = 'block';
 
-    html2pdf().set({
-        margin:      10,
-        filename:    `Factura-${numFactura}.pdf`,
-        image:       { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(area).outputPdf('datauristring').then(pdfDataUrl => {
+    const _restaurar = () => {
         area.classList.remove('factura-pdf-limpia');
         noPrints.forEach(el => el.style.display = '');
         document.getElementById('printClienteNombre').style.display = 'none';
+    };
 
-        API.post('/api/enviar-factura', {
+    let pdfDataUrl;
+    try {
+        await _esperarRecursosFactura(area);
+        pdfDataUrl = await html2pdf().set({
+            margin:      10,
+            filename:    `Factura-${numFactura}.pdf`,
+            image:       { type: 'jpeg', quality: 0.98 },
+            html2canvas: _OPC_HTML2CANVAS,
+            jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(area).outputPdf('datauristring');
+    } catch (e) {
+        _restaurar();
+        alert('❌ No se pudo generar el PDF: ' + (e && e.message ? e.message : e));
+        return;
+    }
+    _restaurar();
+
+    {
+        await API.post('/api/enviar-factura', {
             ot_id:         window._modoRectificativa ? null : otActualId,
             factura_id:    window._facturaActualId,
             emailDestino:  cliente.email,
@@ -714,5 +750,5 @@ async function enviarFacturaAlCliente() {
                 }
             } catch (_) {}
         });
-    });
+    }
 }
