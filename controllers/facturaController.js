@@ -127,10 +127,22 @@ async function guardarBorrador(req, res) {
         }
         const lineasJSON = JSON.stringify(lineas || []);
         if (activa && activa.estado === 'BORRADOR') {
-            await db.execute({
-                sql:  `UPDATE facturas SET base_imponible=?, iva=?, total=?, lineas=? WHERE id=?`,
-                args: [base_imponible, iva, total, lineasJSON, activa.id]
-            });
+            // Si el borrador ya tiene número asignado, regenerar el QR para que su total
+            // siga siendo coherente tras editar las líneas/importes.
+            if (activa.numero_factura) {
+                const fechaQR = activa.fecha_emision || new Date().toISOString().split('T')[0];
+                const textoQR = `NIF:B26892760|Factura:${activa.numero_factura}|Fecha:${fechaQR}|Total:${total}EUR`;
+                const qr      = await QRCode.toDataURL(textoQR);
+                await db.execute({
+                    sql:  `UPDATE facturas SET base_imponible=?, iva=?, total=?, lineas=?, qr_data=? WHERE id=?`,
+                    args: [base_imponible, iva, total, lineasJSON, qr, activa.id]
+                });
+            } else {
+                await db.execute({
+                    sql:  `UPDATE facturas SET base_imponible=?, iva=?, total=?, lineas=? WHERE id=?`,
+                    args: [base_imponible, iva, total, lineasJSON, activa.id]
+                });
+            }
             return res.json({ ok: true, estado: 'BORRADOR', factura_id: activa.id });
         }
         const r = await db.execute({
@@ -141,6 +153,54 @@ async function guardarBorrador(req, res) {
         res.json({ ok: true, estado: 'BORRADOR', factura_id: Number(r.lastInsertRowid) });
     } catch (e) {
         errorServidor(res, e, 'guardarBorrador');
+    }
+}
+
+/**
+ * POST /api/factura/asignar-numero
+ * Body: { ot_id, base_imponible, iva, total, lineas }
+ * Asigna el número fiscal correlativo a la factura SIN congelarla: sigue en
+ * estado BORRADOR y editable. Útil para enviarla al cliente fuera de la app
+ * antes de darla por definitiva (luego se marca EMITIDA, que la hace inmutable).
+ * Idempotente: si ya tiene número (borrador o emitida), lo devuelve sin cambios.
+ */
+async function asignarNumero(req, res) {
+    const { ot_id, base_imponible, iva, total, lineas } = req.body;
+    try {
+        let activa = await _facturaActiva(ot_id);
+        const lineasJSON = JSON.stringify(lineas || (activa ? JSON.parse(activa.lineas || '[]') : []));
+
+        // Asegurar que existe el borrador (crear, o actualizar importes/líneas si sigue editable)
+        if (!activa) {
+            const r = await db.execute({
+                sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, lineas, estado)
+                       VALUES (?, ?, ?, ?, ?, 'BORRADOR')`,
+                args: [ot_id, base_imponible, iva, total, lineasJSON]
+            });
+            activa = { id: Number(r.lastInsertRowid), numero_factura: null, qr_data: null, estado: 'BORRADOR' };
+        } else if (activa.estado === 'BORRADOR') {
+            await db.execute({
+                sql:  `UPDATE facturas SET base_imponible=?, iva=?, total=?, lineas=? WHERE id=?`,
+                args: [base_imponible, iva, total, lineasJSON, activa.id]
+            });
+        }
+
+        // Si ya tiene número (borrador con número, o emitida) → idempotente, sin tocar nada más
+        if (activa.numero_factura) {
+            return res.json({ ok: true, numero_factura: activa.numero_factura, qr_data: activa.qr_data, estado: activa.estado, factura_id: activa.id });
+        }
+
+        const fecha   = new Date().toISOString().split('T')[0];
+        const numero  = await generarNumeroFactura();
+        const textoQR = `NIF:B26892760|Factura:${numero}|Fecha:${fecha}|Total:${total}EUR`;
+        const qr      = await QRCode.toDataURL(textoQR);
+        await db.execute({
+            sql:  `UPDATE facturas SET numero_factura=?, fecha_emision=?, qr_data=? WHERE id=?`,
+            args: [numero, fecha, qr, activa.id]
+        });
+        res.json({ ok: true, numero_factura: numero, qr_data: qr, estado: 'BORRADOR', factura_id: activa.id });
+    } catch (e) {
+        errorServidor(res, e, 'asignarNumero');
     }
 }
 
@@ -166,8 +226,10 @@ async function emitir(req, res) {
             });
         }
 
-        const fecha          = new Date().toISOString().split('T')[0];
-        const numero_factura = await generarNumeroFactura();
+        // Si el borrador ya tenía número asignado (vía /asignar-numero), se respeta;
+        // no se regenera ni se cambia la fecha de emisión original.
+        const fecha          = (activa && activa.fecha_emision) ? activa.fecha_emision : new Date().toISOString().split('T')[0];
+        const numero_factura = (activa && activa.numero_factura) ? activa.numero_factura : await generarNumeroFactura();
         const textoQR        = `NIF:B26892760|Factura:${numero_factura}|Fecha:${fecha}|Total:${total}EUR`;
         const qr             = await QRCode.toDataURL(textoQR);
         const lineasJSON     = JSON.stringify(lineas || (activa ? JSON.parse(activa.lineas || '[]') : []));
@@ -593,4 +655,4 @@ async function reasignarNumero(req, res) {
     }
 }
 
-module.exports = { emitir, guardarBorrador, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero };
+module.exports = { emitir, guardarBorrador, asignarNumero, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero };
