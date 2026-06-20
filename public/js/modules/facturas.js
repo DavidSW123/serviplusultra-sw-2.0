@@ -780,50 +780,34 @@ async function enviarFacturaAlCliente() {
     }
 
     const numFactura = document.getElementById('factNumero').innerText;
-
-    let prep, pdfDataUrl;
     try {
-        prep = await _prepararClonFactura();
-        pdfDataUrl = await html2pdf().set({
-            margin:      10,
-            filename:    `Factura-${numFactura}.pdf`,
-            image:       { type: 'jpeg', quality: 0.98 },
-            html2canvas: _OPC_HTML2CANVAS,
-            jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(prep.clon).outputPdf('datauristring');
-    } catch (e) {
-        if (prep) prep.cleanup();
-        alert('❌ No se pudo generar el PDF: ' + (e && e.message ? e.message : e));
-        return;
-    }
-    prep.cleanup();
-
-    {
-        await API.post('/api/enviar-factura', {
+        // El PDF lo genera el SERVIDOR a partir de los datos del modal (fiable, nunca en blanco).
+        const data = await API.post('/api/enviar-factura', {
             ot_id:         window._modoRectificativa ? null : otActualId,
             factura_id:    window._facturaActualId,
             emailDestino:  cliente.email,
             asunto:        `Factura ${numFactura} - ServiPlusUltra`,
             htmlBody:      `<div style="font-family:Arial;padding:20px;"><h2>Hola, ${cliente.nombre}</h2><p>Adjuntamos la factura <strong>${numFactura}</strong> de la OT <strong>${otActualCodigo}</strong>.</p></div>`,
-            pdfBase64:     pdfDataUrl.split(',')[1],
-            nombreArchivo: `Factura-${numFactura}.pdf`
-        }).then(async data => {
-            if (data.error) { alert('❌ ' + data.error); return; }
-            alert('✅ ' + data.mensaje);
-            // Refrescar badge: si rectificativa, recargar desde /api/facturas/:id; si no, otsGlobal
-            try {
-                if (window._modoRectificativa) {
-                    const fresh = await API.get(`/api/facturas/${window._facturaActualId}`);
-                    if (fresh && !fresh.error) _renderBadgeEnviada(fresh.emails_enviados);
-                } else {
-                    const frescas = await API.get('/api/ot');
-                    if (Array.isArray(frescas)) {
-                        otsGlobal = frescas;
-                        const otFresh = otsGlobal.find(o => o.id === otActualId);
-                        if (otFresh) _renderBadgeEnviada(otFresh.factura_emails_enviados);
-                    }
-                }
-            } catch (_) {}
+            nombreArchivo: _numFacturaArchivo() + '.pdf',
+            datos:         _datosFacturaModal()
         });
+        if (data.error) { alert('❌ ' + data.error); return; }
+        alert('✅ ' + data.mensaje);
+        // Refrescar badge: si rectificativa, recargar desde /api/facturas/:id; si no, otsGlobal
+        try {
+            if (window._modoRectificativa) {
+                const fresh = await API.get(`/api/facturas/${window._facturaActualId}`);
+                if (fresh && !fresh.error) _renderBadgeEnviada(fresh.emails_enviados);
+            } else {
+                const frescas = await API.get('/api/ot');
+                if (Array.isArray(frescas)) {
+                    otsGlobal = frescas;
+                    const otFresh = otsGlobal.find(o => o.id === otActualId);
+                    if (otFresh) _renderBadgeEnviada(otFresh.factura_emails_enviados);
+                }
+            }
+        } catch (_) {}
+    } catch (e) {
+        alert('❌ Error al enviar: ' + (e.message || e));
     }
 }
