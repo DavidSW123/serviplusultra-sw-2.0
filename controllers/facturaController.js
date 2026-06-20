@@ -720,38 +720,57 @@ function _construirPdfFactura(doc, d) {
     doc.text('Cant.', cCant, y, { width: 50 });
     doc.text('Precio/U (€)', cPre, y, { width: 90 });
     doc.text('Total', right - 106, y, { width: 100, align: 'right' });
-    y += 25;
+    y += 34;   // más aire bajo la cabecera
 
-    // ── Filas (concepto ENVUELVE; total nunca se parte) ──
+    // ── Filas (concepto ENVUELVE; total nunca se parte) ── con más espacio entre líneas
     (d.lineas || []).forEach(l => {
         const cant = Number(l.cantidad) || 0, precio = Number(l.precio) || 0;
         const concepto = String(l.concepto || '');
         doc.font('Helvetica').fontSize(10).fillColor('#000');
         const hCon = doc.heightOfString(concepto, { width: wCon });
-        const rowH = Math.max(hCon, 13) + 10;
-        if (y + rowH > doc.page.height - 150) { doc.addPage(); y = M; }
+        const rowH = Math.max(hCon, 13) + 20;   // más espacio entre líneas
+        if (y + rowH > doc.page.height - 230) { doc.addPage(); y = M; }   // reserva sitio para el footer
         doc.text(concepto, cCon + 8, y, { width: wCon });
         doc.text(String(cant), cCant, y, { width: 50 });
         doc.text(String(precio), cPre, y, { width: 90 });
         doc.text(_eur(cant * precio), right - 106, y, { width: 100, align: 'right' });
         y += rowH;
-        doc.moveTo(M, y - 6).lineTo(right, y - 6).lineWidth(0.5).strokeColor('#e5e5e5').stroke();
+        doc.moveTo(M, y - 8).lineTo(right, y - 8).lineWidth(0.5).strokeColor('#e5e5e5').stroke();
     });
 
-    // QR (izquierda) + caja de totales (derecha)
-    y += 18;
-    if (y > doc.page.height - 130) { doc.addPage(); y = M; }
+    // ── FOOTER anclado abajo: QR (izq) + caja de totales (der); debajo, nota legal en gris claro ──
+    const legal =
+        'De conformidad con el Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018 (LOPDGDD), los datos ' +
+        'facilitados serán tratados por ServiPlusUltra Solutions S.L. (NIF B-26892760) con la finalidad de ' +
+        'gestionar la relación comercial y la facturación. Puede ejercer sus derechos de acceso, rectificación, ' +
+        'supresión y oposición en serviplusultrasolutionssl@gmail.com. Conserve esta factura como justificante de pago.';
+    const tw = 220, tx = right - tw, totH = 78, filaH = 95;   // filaH = alto del QR
+    doc.font('Helvetica').fontSize(7.5);
+    const legalH = doc.heightOfString(legal, { width: right - M });
+    const footH  = filaH + 16 + legalH;
+    let fy = Math.max(y + 28, doc.page.height - 40 - footH);
+    if (fy + footH > doc.page.height - 30) { doc.addPage(); fy = doc.page.height - 40 - footH; }
+
+    // separador superior del footer
+    doc.moveTo(M, fy - 16).lineTo(right, fy - 16).lineWidth(0.5).strokeColor('#dddddd').stroke();
+
+    // QR (izquierda)
     if (d.qr_data && String(d.qr_data).includes(',')) {
-        try { doc.image(Buffer.from(String(d.qr_data).split(',')[1], 'base64'), M, y, { width: 95 }); } catch (_) {}
+        try { doc.image(Buffer.from(String(d.qr_data).split(',')[1], 'base64'), M, fy, { width: 95 }); } catch (_) {}
     }
-    const tw = 210, tx = right - tw;
-    doc.save().roundedRect(tx, y, tw, 74, 4).fill('#f8f9fa').restore();
-    doc.fillColor(dark).font('Helvetica').fontSize(10).text('Base:', tx + 12, y + 10);
-    doc.font('Helvetica-Bold').text(_eur(d.base), tx + tw - 110, y + 10, { width: 98, align: 'right' });
-    doc.font('Helvetica').fillColor(dark).text('IVA (21%):', tx + 12, y + 28);
-    doc.font('Helvetica-Bold').text(_eur(d.iva), tx + tw - 110, y + 28, { width: 98, align: 'right' });
-    doc.font('Helvetica-Bold').fontSize(13).fillColor(teal).text('Total:', tx + 12, y + 48);
-    doc.text(_eur(d.total), tx + tw - 110, y + 47, { width: 98, align: 'right' });
+    // Caja de totales (derecha)
+    doc.save().roundedRect(tx, fy, tw, totH, 4).fill('#f8f9fa').restore();
+    doc.fillColor(dark).font('Helvetica').fontSize(10).text('Base:', tx + 14, fy + 12);
+    doc.font('Helvetica-Bold').text(_eur(d.base), tx + tw - 112, fy + 12, { width: 98, align: 'right' });
+    doc.font('Helvetica').fillColor(dark).text('IVA (21%):', tx + 14, fy + 30);
+    doc.font('Helvetica-Bold').text(_eur(d.iva), tx + tw - 112, fy + 30, { width: 98, align: 'right' });
+    doc.moveTo(tx + 14, fy + 50).lineTo(tx + tw - 14, fy + 50).lineWidth(0.5).strokeColor('#cccccc').stroke();
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(teal).text('Total:', tx + 14, fy + 56);
+    doc.text(_eur(d.total), tx + tw - 112, fy + 55, { width: 98, align: 'right' });
+
+    // Nota legal (gris claro), debajo del footer
+    doc.font('Helvetica').fontSize(7.5).fillColor('#9aa3ab')
+       .text(legal, M, fy + filaH + 16, { width: right - M, align: 'justify' });
 }
 
 /** Genera el PDF en memoria y lo resuelve como Buffer. */
