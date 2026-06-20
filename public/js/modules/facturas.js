@@ -648,35 +648,58 @@ function _esperarRecursosFactura(area) {
 
 const _OPC_HTML2CANVAS = { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false };
 
-/** Descarga el PDF de la factura sin cabeceras del navegador. */
-async function descargarFacturaPDF() {
-    const numFactura = document.getElementById('factNumero').innerText;
-    const area       = document.getElementById('facturaAreaImpresion');
-    const noPrints   = document.querySelectorAll('.no-print');
+/**
+ * Prepara la factura para exportar y la CLONA a un contenedor limpio al principio
+ * del <body>. Capturar el clon (posición fija en 0,0, FUERA del modal) evita el PDF
+ * en blanco que ocurre en algunos navegadores al renderizar un elemento dentro de
+ * un modal position:fixed con scroll. Devuelve { clon, cleanup }.
+ */
+async function _prepararClonFactura() {
+    const area     = document.getElementById('facturaAreaImpresion');
+    const noPrints = document.querySelectorAll('.no-print');
 
     area.classList.add('factura-pdf-limpia');
     noPrints.forEach(el => el.style.display = 'none');
     document.getElementById('printClienteNombre').style.display = 'block';
+    await _esperarRecursosFactura(area);
 
-    const _restaurar = () => {
+    const clon  = area.cloneNode(true);   // copia clases (factura-pdf-limpia) y estilos inline (display:none)
+    clon.style.margin = '0';
+    clon.style.maxWidth = '800px';
+    clon.style.width    = '800px';
+    const cont = document.createElement('div');
+    // Ancho fijo 800px (el del folio): PDF consistente sea cual sea el tamaño de pantalla.
+    cont.style.cssText = 'position:fixed; left:0; top:0; z-index:-1; background:#ffffff; width:800px;';
+    cont.appendChild(clon);
+    document.body.appendChild(cont);
+    await _esperarRecursosFactura(clon);   // esperar a las imágenes del clon (logo/QR recargan)
+
+    const cleanup = () => {
+        if (cont.parentNode) cont.parentNode.removeChild(cont);
         area.classList.remove('factura-pdf-limpia');
         noPrints.forEach(el => el.style.display = '');
         document.getElementById('printClienteNombre').style.display = 'none';
     };
+    return { clon, cleanup };
+}
 
+/** Descarga el PDF de la factura sin cabeceras del navegador. */
+async function descargarFacturaPDF() {
+    const numFactura = document.getElementById('factNumero').innerText;
+    let prep;
     try {
-        await _esperarRecursosFactura(area);
+        prep = await _prepararClonFactura();
         await html2pdf().set({
             margin:      10,
             filename:    `Factura-${numFactura}.pdf`,
             image:       { type: 'jpeg', quality: 0.98 },
             html2canvas: _OPC_HTML2CANVAS,
             jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(area).save();
+        }).from(prep.clon).save();
     } catch (e) {
         alert('❌ No se pudo generar el PDF (' + (e && e.message ? e.message : e) + '). Inténtalo de nuevo; si persiste, prueba con otro navegador.');
     } finally {
-        _restaurar();
+        if (prep) prep.cleanup();
     }
 }
 
@@ -693,35 +716,23 @@ async function enviarFacturaAlCliente() {
     }
 
     const numFactura = document.getElementById('factNumero').innerText;
-    const area       = document.getElementById('facturaAreaImpresion');
-    const noPrints   = document.querySelectorAll('.no-print');
 
-    area.classList.add('factura-pdf-limpia');
-    noPrints.forEach(el => el.style.display = 'none');
-    document.getElementById('printClienteNombre').style.display = 'block';
-
-    const _restaurar = () => {
-        area.classList.remove('factura-pdf-limpia');
-        noPrints.forEach(el => el.style.display = '');
-        document.getElementById('printClienteNombre').style.display = 'none';
-    };
-
-    let pdfDataUrl;
+    let prep, pdfDataUrl;
     try {
-        await _esperarRecursosFactura(area);
+        prep = await _prepararClonFactura();
         pdfDataUrl = await html2pdf().set({
             margin:      10,
             filename:    `Factura-${numFactura}.pdf`,
             image:       { type: 'jpeg', quality: 0.98 },
             html2canvas: _OPC_HTML2CANVAS,
             jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(area).outputPdf('datauristring');
+        }).from(prep.clon).outputPdf('datauristring');
     } catch (e) {
-        _restaurar();
+        if (prep) prep.cleanup();
         alert('❌ No se pudo generar el PDF: ' + (e && e.message ? e.message : e));
         return;
     }
-    _restaurar();
+    prep.cleanup();
 
     {
         await API.post('/api/enviar-factura', {
