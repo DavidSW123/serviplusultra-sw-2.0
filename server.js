@@ -25,7 +25,14 @@ app.use(cors({ origin: env.APP_ORIGIN, credentials: true }));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use(express.static(path.join(__dirname, 'public'), {
+    index: false,
+    setHeaders: (res, ruta) => {
+        // JS/CSS: revalidar siempre (evita servir versiones cacheadas y obsoletas
+        // tras un despliegue; con ETag responde 304 si no ha cambiado).
+        if (/\.(js|css)$/i.test(ruta)) res.setHeader('Cache-Control', 'no-cache');
+    }
+}));
 
 // ── Rate limiting ──────────────────────────────────────────────
 // Límite global generoso para uso normal de la API.
@@ -53,13 +60,19 @@ app.use('/api',                    limitadorGlobal);
 app.use('/api', apiRoutes);
 
 // ── Páginas HTML ───────────────────────────────────────────────
-app.get('/',              (_req, res) => res.sendFile(path.join(__dirname, 'public', 'hub.html')));
-app.get('/facturas',      (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/contabilidad',  (_req, res) => res.sendFile(path.join(__dirname, 'public', 'contabilidad.html')));
-app.get('/presupuestos',  (_req, res) => res.sendFile(path.join(__dirname, 'public', 'presupuestos.html')));
-app.get('/bbdd',          (_req, res) => res.sendFile(path.join(__dirname, 'public', 'bbdd.html')));
-app.get('/login',         (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/reset-password',(_req, res) => res.sendFile(path.join(__dirname, 'public', 'reset.html')));
+// Sin caché: que el navegador revalide y reciba siempre el HTML actual (que
+// referencia los JS/CSS al día).
+const enviarPagina = (archivo) => (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, 'public', archivo));
+};
+app.get('/',              enviarPagina('hub.html'));
+app.get('/facturas',      enviarPagina('index.html'));
+app.get('/contabilidad',  enviarPagina('contabilidad.html'));
+app.get('/presupuestos',  enviarPagina('presupuestos.html'));
+app.get('/bbdd',          enviarPagina('bbdd.html'));
+app.get('/login',         enviarPagina('login.html'));
+app.get('/reset-password',enviarPagina('reset.html'));
 
 // ── 404 para API no encontrada ─────────────────────────────────
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint no encontrado.' }));
