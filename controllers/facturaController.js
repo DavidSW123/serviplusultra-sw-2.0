@@ -667,6 +667,15 @@ function _construirPdfFactura(doc, d) {
     const M = 40, right = doc.page.width - M;
     const teal = '#1abc9c', dark = '#2c3e50', grey = '#7f8c8d';
 
+    // Fuente profesional (Lato). Si faltara el archivo, cae a Helvetica.
+    let FREG = 'Helvetica', FBOLD = 'Helvetica-Bold';
+    try {
+        const fdir = path.join(__dirname, '..', 'assets', 'fonts');
+        doc.registerFont('Lato', path.join(fdir, 'Lato-Regular.ttf'));
+        doc.registerFont('Lato-Bold', path.join(fdir, 'Lato-Bold.ttf'));
+        FREG = 'Lato'; FBOLD = 'Lato-Bold';
+    } catch (_) {}
+
     // ── Logo (arriba izquierda) ──
     let logoBottom = M + 50;
     try {
@@ -677,10 +686,10 @@ function _construirPdfFactura(doc, d) {
     } catch (_) {}
 
     // ── "FACTURA" + datos (arriba derecha, con línea teal) ──
-    doc.fillColor(teal).font('Helvetica-Bold').fontSize(26).text('FACTURA', M, M + 2, { width: right - M, align: 'right' });
+    doc.fillColor(teal).font(FBOLD).fontSize(26).text('FACTURA', M, M + 2, { width: right - M, align: 'right' });
     const facY = M + 34;
     doc.moveTo(right - 200, facY).lineTo(right, facY).lineWidth(2).strokeColor(teal).stroke();
-    doc.font('Helvetica').fontSize(10).fillColor(dark);
+    doc.font(FREG).fontSize(10).fillColor(dark);
     doc.text(`Nº de Factura: ${d.numero || '—'}`,  M, facY + 8, { width: right - M, align: 'right' });
     doc.text(`Ref. OT: ${d.otCode || '—'}`,         M, doc.y,    { width: right - M, align: 'right' });
     doc.text(`Fecha de emisión: ${d.fecha || '—'}`, M, doc.y,    { width: right - M, align: 'right' });
@@ -688,10 +697,10 @@ function _construirPdfFactura(doc, d) {
 
     // ── Datos de empresa (izquierda, BAJO el logo, con línea teal) ──
     let yIzq = logoBottom + 16;
-    doc.font('Helvetica-Bold').fontSize(13).fillColor(dark).text('ServiPlusUltra Solutions S.L.', M, yIzq, { width: 250 });
+    doc.font(FBOLD).fontSize(13).fillColor(dark).text('ServiPlusUltra Solutions S.L.', M, yIzq, { width: 250 });
     const nameBottom = doc.y;
     doc.moveTo(M, nameBottom + 3).lineTo(M + 220, nameBottom + 3).lineWidth(2).strokeColor(teal).stroke();
-    doc.font('Helvetica').fontSize(9).fillColor(grey)
+    doc.font(FREG).fontSize(9).fillColor(grey)
        .text('B-26892760', M, nameBottom + 8)
        .text("Carrer d'Aribau 168, 1-1, 08036 BCN", M, doc.y);
     const izqEnd = doc.y;
@@ -699,14 +708,14 @@ function _construirPdfFactura(doc, d) {
     // ── Caja de cliente (derecha) ──
     const cli = d.cliente || {};
     const bw = 250, bx = right - bw, by = Math.max(derEnd + 14, logoBottom + 16);
-    doc.font('Helvetica').fontSize(8.5);
+    doc.font(FREG).fontSize(8.5);
     let bh = 42;
     if (cli.nif) bh += 12;
     if (cli.direccion) bh += doc.heightOfString('Dir: ' + cli.direccion, { width: bw - 24 });
     doc.save().roundedRect(bx, by, bw, bh, 4).fill('#f0f4f8').restore();
-    doc.fillColor(dark).font('Helvetica-Bold').fontSize(9).text('Facturar a:', bx + 12, by + 9, { width: bw - 24 });
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(dark).text(cli.nombre || 'Consumidor Final', bx + 12, doc.y + 1, { width: bw - 24 });
-    doc.font('Helvetica').fontSize(8.5).fillColor('#555');
+    doc.fillColor(dark).font(FBOLD).fontSize(9).text('Facturar a:', bx + 12, by + 9, { width: bw - 24 });
+    doc.font(FBOLD).fontSize(11).fillColor(dark).text(cli.nombre || 'Consumidor Final', bx + 12, doc.y + 1, { width: bw - 24 });
+    doc.font(FREG).fontSize(8.5).fillColor('#555');
     if (cli.nif)       doc.text(`NIF/CIF: ${cli.nif}`, bx + 12, doc.y + 2, { width: bw - 24 });
     if (cli.direccion) doc.text(`Dir: ${cli.direccion}`, bx + 12, doc.y, { width: bw - 24 });
 
@@ -715,7 +724,7 @@ function _construirPdfFactura(doc, d) {
     const cCon = M, cCant = 300, cPre = 365;
     const wCon = cCant - cCon - 16;
     doc.save().rect(M, y - 5, right - M, 22).fill(dark).restore();
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9.5);
+    doc.fillColor('#ffffff').font(FBOLD).fontSize(9.5);
     doc.text('Concepto', cCon + 8, y, { width: wCon });
     doc.text('Cant.', cCant, y, { width: 50 });
     doc.text('Precio/U (€)', cPre, y, { width: 90 });
@@ -726,9 +735,9 @@ function _construirPdfFactura(doc, d) {
     (d.lineas || []).forEach(l => {
         const cant = Number(l.cantidad) || 0, precio = Number(l.precio) || 0;
         const concepto = String(l.concepto || '');
-        doc.font('Helvetica').fontSize(10).fillColor('#000');
+        doc.font(FREG).fontSize(11).fillColor('#000');
         const hCon = doc.heightOfString(concepto, { width: wCon });
-        const rowH = Math.max(hCon, 13) + 20;   // más espacio entre líneas
+        const rowH = Math.max(hCon, 15) + 18;   // más espacio entre líneas
         if (y + rowH > doc.page.height - 230) { doc.addPage(); y = M; }   // reserva sitio para el footer
         doc.text(concepto, cCon + 8, y, { width: wCon });
         doc.text(String(cant), cCant, y, { width: 50 });
@@ -743,9 +752,9 @@ function _construirPdfFactura(doc, d) {
         'De conformidad con el Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018 (LOPDGDD), los datos ' +
         'facilitados serán tratados por ServiPlusUltra Solutions S.L. (NIF B-26892760) con la finalidad de ' +
         'gestionar la relación comercial y la facturación. Puede ejercer sus derechos de acceso, rectificación, ' +
-        'supresión y oposición en serviplusultrasolutionssl@gmail.com. Conserve esta factura como justificante de pago.';
+        'supresión y oposición en info@serviplusultrasolutionssl.com. Conserve esta factura como justificante de pago.';
     const tw = 220, tx = right - tw, totH = 78, filaH = 95;   // filaH = alto del QR
-    doc.font('Helvetica').fontSize(7.5);
+    doc.font(FREG).fontSize(7.5);
     const legalH = doc.heightOfString(legal, { width: right - M });
     const footH  = filaH + 16 + legalH;
     let fy = Math.max(y + 28, doc.page.height - 40 - footH);
@@ -760,16 +769,16 @@ function _construirPdfFactura(doc, d) {
     }
     // Caja de totales (derecha)
     doc.save().roundedRect(tx, fy, tw, totH, 4).fill('#f8f9fa').restore();
-    doc.fillColor(dark).font('Helvetica').fontSize(10).text('Base:', tx + 14, fy + 12);
-    doc.font('Helvetica-Bold').text(_eur(d.base), tx + tw - 112, fy + 12, { width: 98, align: 'right' });
-    doc.font('Helvetica').fillColor(dark).text('IVA (21%):', tx + 14, fy + 30);
-    doc.font('Helvetica-Bold').text(_eur(d.iva), tx + tw - 112, fy + 30, { width: 98, align: 'right' });
+    doc.fillColor(dark).font(FREG).fontSize(10).text('Base:', tx + 14, fy + 12);
+    doc.font(FBOLD).text(_eur(d.base), tx + tw - 112, fy + 12, { width: 98, align: 'right' });
+    doc.font(FREG).fillColor(dark).text('IVA (21%):', tx + 14, fy + 30);
+    doc.font(FBOLD).text(_eur(d.iva), tx + tw - 112, fy + 30, { width: 98, align: 'right' });
     doc.moveTo(tx + 14, fy + 50).lineTo(tx + tw - 14, fy + 50).lineWidth(0.5).strokeColor('#cccccc').stroke();
-    doc.font('Helvetica-Bold').fontSize(13).fillColor(teal).text('Total:', tx + 14, fy + 56);
+    doc.font(FBOLD).fontSize(13).fillColor(teal).text('Total:', tx + 14, fy + 56);
     doc.text(_eur(d.total), tx + tw - 112, fy + 55, { width: 98, align: 'right' });
 
     // Nota legal (gris claro), debajo del footer
-    doc.font('Helvetica').fontSize(7.5).fillColor('#9aa3ab')
+    doc.font(FREG).fontSize(7.5).fillColor('#9aa3ab')
        .text(legal, M, fy + filaH + 16, { width: right - M, align: 'justify' });
 }
 
