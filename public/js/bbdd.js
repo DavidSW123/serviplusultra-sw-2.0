@@ -1,28 +1,13 @@
-const sesionStr = localStorage.getItem('sesionPlusUltra');
-if (!sesionStr) window.location.href = '/login';
-const sesion = JSON.parse(sesionStr);
-// La sesión viaja en cookie httpOnly (se envía sola en mismo origen). Solo Content-Type.
-const headersSeguridad = { 'Content-Type': 'application/json' };
-
-// Escapa texto del usuario antes de meterlo en innerHTML (previene XSS).
-function escapeHTML(v) {
-    if (v === null || v === undefined) return '';
-    return String(v)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-const prefijoAnoActual = `OT${new Date().getFullYear().toString().slice(-2)}/`;
+// sesion, sesionStr, headersSeguridad, escapeHTML, prefijoAnoActual, clientesGlobal,
+// otsGlobal, ed_tecnicosSeleccionados y otActualId los aportan /js/api.js, /js/ui.js
+// y /js/modules/ot.js, cargados ANTES que este archivo (api.js ya valida la sesión y
+// redirige a /login si falta). NO se redeclaran aquí: un const/let duplicado entre
+// scripts clásicos lanza SyntaxError y dejaría toda la página sin JS.
 
 document.getElementById('infoUsuarioBBDD').innerHTML = `👤 <strong>${sesion.username.toUpperCase()}</strong> (${sesion.rol})`;
 if (sesion.rol !== 'admin') document.getElementById('colAcciones').style.display = 'none';
 
 let datosBBDD = [];
-let clientesGlobal = [];
-let ed_tecnicosSeleccionados = [];
-let otActualId = null;
 
 // ── CARGA DE DATOS ───────────────────────────────────────────
 
@@ -41,9 +26,11 @@ async function cargarDatos() {
             selectCliente.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
             selEdit.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
         });
+        poblarSelectFactura();   // rellena el <select> de cliente del modal de factura
 
         const resOT = await fetch('/api/ot', { headers: headersSeguridad });
         datosBBDD = await resOT.json();
+        otsGlobal = datosBBDD;   // facturas.js localiza la OT en otsGlobal
         dibujarTabla(datosBBDD);
     } catch (e) {
         document.getElementById('cuerpoTabla').innerHTML =
@@ -80,7 +67,7 @@ function dibujarTabla(datos) {
 
         tbody.innerHTML += `<tr>
             <td>${ot.id}</td>
-            <td><a href="/facturas?openFactura=${ot.id}" style="color:#1abc9c; font-weight:bold; text-decoration:none; cursor:pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir vista de factura de esta OT">${escapeHTML(ot.codigo_ot)}</a></td>
+            <td><a href="javascript:void(0)" onclick="abrirFacturaDesdeBBDD(${ot.id})" style="color:#1abc9c; font-weight:bold; text-decoration:none; cursor:pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" title="Abrir la factura de esta OT (sin salir de la BBDD)">${escapeHTML(ot.codigo_ot)}</a></td>
             <td>${escapeHTML(nombreCliente)}</td>
             <td>${escapeHTML(ot.marca)}</td>
             <td>${escapeHTML(fechaLimpia)}</td>
@@ -105,7 +92,34 @@ function eliminarFila(id) {
 // ── MODAL DE EDICIÓN ─────────────────────────────────────────
 
 function abrirModal(id)  { document.getElementById(id).style.display = 'block'; }
-function cerrarModal(id) { document.getElementById(id).style.display = 'none';  }
+function cerrarModal(id) {
+    document.getElementById(id).style.display = 'none';
+    // Al cerrar el modal de factura abierto desde la BBDD, refrescar la tabla:
+    // facturas.js actualiza otsGlobal tras emitir/asignar/rectificar, pero no la tabla.
+    if (id === 'modalFactura' && Array.isArray(otsGlobal)) { datosBBDD = otsGlobal; filtrarTabla(); }
+}
+
+/** Rellena el <select id="selClienteFactura"> del modal de factura (mismo patrón que clientes.js). */
+function poblarSelectFactura() {
+    const selFact = document.getElementById('selClienteFactura');
+    if (!selFact) return;
+    selFact.innerHTML = '<option value="">-- Seleccionar Cliente --</option>';
+    clientesGlobal.filter(c => c.estado === 'APROBADO').forEach(c => {
+        selFact.innerHTML += `<option value="${c.id}">${escapeHTML(c.nombre)}</option>`;
+    });
+}
+
+/** Abre la factura de una OT en el modal, dentro de la propia BBDD (sin navegar a /facturas). */
+function abrirFacturaDesdeBBDD(id) {
+    if (!Array.isArray(otsGlobal) || !otsGlobal.find(o => o.id === id)) {
+        // Salvaguarda por si los datos aún no estuvieran cargados: recargar y reintentar.
+        cargarDatos().then(() => {
+            if (Array.isArray(otsGlobal) && otsGlobal.find(o => o.id === id)) abrirGeneradorFactura(id);
+        });
+        return;
+    }
+    abrirGeneradorFactura(id);
+}
 
 function cargarUsuariosParaOT() {
     fetch('/api/usuarios/nombres')
