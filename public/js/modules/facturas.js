@@ -683,7 +683,24 @@ async function _prepararClonFactura() {
     return { clon, cleanup };
 }
 
-/** Descarga el PDF de la factura sin cabeceras del navegador. */
+/**
+ * Genera el PDF mediante la IMPRESIÓN NATIVA del navegador (window.print →
+ * "Guardar como PDF" / "Microsoft Print to PDF"). Es el método FIABLE: usa el
+ * motor del navegador, no html2canvas, así que nunca sale en blanco y el texto
+ * sale vectorial (nítido y seleccionable). Aísla la factura con body.imprimir-factura.
+ */
+function imprimirFacturaPDF() {
+    document.body.classList.add('imprimir-factura');
+    const limpiar = () => {
+        document.body.classList.remove('imprimir-factura');
+        window.removeEventListener('afterprint', limpiar);
+    };
+    window.addEventListener('afterprint', limpiar);
+    // respiro para que se apliquen los estilos de impresión antes de abrir el diálogo
+    setTimeout(() => window.print(), 80);
+}
+
+/** Descarga el PDF de la factura vía html2canvas (alternativa; puede fallar en algunos navegadores). */
 async function descargarFacturaPDF() {
     const numFactura = document.getElementById('factNumero').innerText;
     let prep;
