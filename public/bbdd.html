@@ -10,6 +10,12 @@
     <link rel="stylesheet" href="/css/base.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/bbdd.css">
+    <style>
+        /* El modal de factura reutiliza components.css, pero bbdd.css (cargado después)
+           le cuela su .modal-content (max-width:600px). Restauramos el ancho del folio
+           para que se vea igual que en la página de Facturas. */
+        #modalFactura .modal-content-folio { max-width: 800px; }
+    </style>
 </head>
 <body>
 
