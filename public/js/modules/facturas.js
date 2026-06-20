@@ -723,37 +723,47 @@ function imprimirFacturaPDF() {
     setTimeout(() => window.print(), 80);
 }
 
+/** Datos de la factura tal como se ven en el modal (para generar el PDF en servidor). */
+function _datosFacturaModal() {
+    const cliId = document.getElementById('selClienteFactura').value;
+    const cli   = (typeof clientesGlobal !== 'undefined' && clientesGlobal.find) ? clientesGlobal.find(c => c.id == cliId) : null;
+    const bloqueQR = document.getElementById('bloqueQRFact');
+    return {
+        numero:  document.getElementById('factNumero').innerText.trim(),
+        fecha:   document.getElementById('factFechaHoy').innerText.trim(),
+        otCode:  document.getElementById('factOtCode').innerText.trim(),
+        cliente: cli ? { nombre: cli.nombre, nif: cli.nif, direccion: cli.direccion } : null,
+        lineas:  lineasFactura,
+        base:    parseFloat(document.getElementById('factBase').innerText) || 0,
+        iva:     parseFloat(document.getElementById('factIva').innerText) || 0,
+        total:   parseFloat(document.getElementById('factTotal').innerText) || 0,
+        qr_data: (bloqueQR && bloqueQR.style.display !== 'none') ? document.getElementById('factQRImg').src : null
+    };
+}
+
 /**
- * Descarga directa del PDF (aparece en la lista de descargas de Chrome, con el
- * nombre de la factura). Genera primero el canvas y, si saliera en blanco
- * (fallo de html2canvas en algunos equipos), recurre a la impresión nativa.
+ * Descarga el PDF generado en el SERVIDOR (pdfkit). Fiable (nunca en blanco),
+ * aparece en la lista de descargas de Chrome y con el nombre de la factura.
+ * Si la petición fallara, recurre a la impresión nativa del navegador.
  */
 async function descargarFacturaPDF() {
-    const opts = {
-        margin:      10,
-        filename:    _numFacturaArchivo() + '.pdf',
-        image:       { type: 'jpeg', quality: 0.98 },
-        html2canvas: _OPC_HTML2CANVAS,
-        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    let prep;
     try {
-        prep = await _prepararClonFactura();
-        // 1) Render de prueba: comprobar que el contenido NO sale en blanco.
-        const canvas = await html2pdf().set(opts).from(prep.clon).toCanvas().get('canvas');
-        if (_canvasEnBlanco(canvas)) {
-            prep.cleanup(); prep = null;
-            imprimirFacturaPDF();   // respaldo fiable
-            return;
-        }
-        // 2) Descarga real (lista de descargas de Chrome + nombre de la factura).
-        await html2pdf().set(opts).from(prep.clon).save();
+        const resp = await fetch('/api/factura/pdf', {
+            method:      'POST',
+            headers:     { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body:        JSON.stringify(_datosFacturaModal())
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url; a.download = _numFacturaArchivo() + '.pdf';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (e) {
-        if (prep) { prep.cleanup(); prep = null; }
-        imprimirFacturaPDF();       // respaldo ante cualquier error
-        return;
-    } finally {
-        if (prep) prep.cleanup();
+        alert('❌ No se pudo descargar el PDF (' + (e.message || e) + '). Abro la impresión como alternativa.');
+        imprimirFacturaPDF();
     }
 }
 
