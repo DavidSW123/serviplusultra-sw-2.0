@@ -75,7 +75,7 @@ async function abrirGeneradorFactura(id) {
     document.getElementById('factNumero').style.color  = ot.numero_factura ? '#1abc9c' : '#aaa';
 
     document.getElementById('factOtCode').innerText    = ot.codigo_ot;
-    document.getElementById('factNumero').innerText    = ot.numero_factura || '(se asignará al emitir)';
+    document.getElementById('factNumero').innerText    = ot.numero_factura || '(sin número)';
     document.getElementById('factNumero').style.color  = ot.numero_factura ? '#1abc9c' : '#aaa';
 
     const fechaEmision = ot.factura_fecha_emision
@@ -86,8 +86,8 @@ async function abrirGeneradorFactura(id) {
     document.getElementById('selClienteFactura').value = ot.cliente_id || '';
     actualizarInfoClienteFactura();
 
-    // Si la factura ya fue guardada, cargar sus líneas guardadas
-    if (ot.numero_factura && ot.factura_lineas) {
+    // Si la factura ya fue guardada (borrador con o sin número, o emitida), cargar sus líneas
+    if (ot.factura_lineas) {
         try {
             lineasFactura = JSON.parse(ot.factura_lineas);
         } catch (_) {
@@ -113,31 +113,41 @@ async function abrirGeneradorFactura(id) {
 
     // Botones del modal
     const btnRect    = document.getElementById('btnRectificarFact');
-    const btnGuardar = document.querySelector('#modalFactura [onclick="guardarCambiosFactura()"]');
+    const btnGuardar = document.getElementById('btnGuardarBorrador');
+    const btnAsignar = document.getElementById('btnAsignarNumFact');
     const btnEmitir  = document.getElementById('btnEmitirFact');
-    const btnEmail   = document.querySelector('#modalFactura [onclick="enviarFacturaAlCliente()"]');
-    const btnPDF     = document.querySelector('#modalFactura [onclick="descargarFacturaPDF()"]');
-    [btnRect, btnGuardar, btnEmitir, btnEmail, btnPDF].forEach(b => { if (b) b.style.display = ''; });
+    const btnEmail   = document.getElementById('btnEnviarFact');
+    const btnPDF     = document.getElementById('btnDescargarFact');
+    [btnRect, btnGuardar, btnAsignar, btnEmitir, btnEmail, btnPDF].forEach(b => { if (b) b.style.display = ''; });
     if (btnGuardar) { btnGuardar.innerText = '💾 Guardar borrador'; btnGuardar.style.backgroundColor = ''; btnGuardar.style.color = ''; }
 
-    const estado = ot.factura_estado || (ot.numero_factura ? 'EMITIDA' : 'BORRADOR');
-    const wrap   = document.getElementById('factBadgesWrap');
+    const estado   = ot.factura_estado || (ot.numero_factura ? 'EMITIDA' : 'BORRADOR');
+    const tieneNum = !!ot.numero_factura;
+    const wrap     = document.getElementById('factBadgesWrap');
 
     if (estado === 'EMITIDA') {
         // Factura definitiva: congelada. Solo PDF, enviar y rectificar.
         if (btnGuardar) btnGuardar.style.display = 'none';
+        if (btnAsignar) btnAsignar.style.display = 'none';
         if (btnEmitir)  btnEmitir.style.display = 'none';
         if (wrap) wrap.insertAdjacentHTML('beforeend',
             `<span id="tagEstadoFact" class="fact-pill fact-pill-green fact-pill-static" title="Factura definitiva e inmutable">✅ EMITIDA</span>`);
     } else {
-        // BORRADOR (o aún sin factura): editable. Guardar borrador + Emitir. Sin email/rectificar.
+        // BORRADOR (con o sin número): editable. Sin email/rectificar hasta emitir.
         if (btnEmail) btnEmail.style.display = 'none';
         if (btnRect)  btnRect.style.display = 'none';
+        // "Asignar número" solo si todavía no lo tiene
+        if (btnAsignar) btnAsignar.style.display = tieneNum ? 'none' : '';
+        const badgeTxt   = tieneNum ? '📝 BORRADOR · nº ' + escapeHTML(ot.numero_factura) : '📝 BORRADOR';
+        const badgeTitle = tieneNum ? 'Borrador con número asignado: editable hasta marcarla como emitida' : 'Borrador sin número fiscal';
         if (wrap) wrap.insertAdjacentHTML('beforeend',
-            `<span id="tagEstadoFact" class="fact-pill fact-pill-grey fact-pill-static" title="Borrador sin número fiscal">📝 BORRADOR</span>`);
+            `<span id="tagEstadoFact" class="fact-pill fact-pill-grey fact-pill-static" title="${badgeTitle}">${badgeTxt}</span>`);
         const factHeader = document.querySelector('.datos-factura');
+        const avisoHtml  = tieneNum
+            ? `Borrador <strong>con número ${escapeHTML(ot.numero_factura)}</strong> (ya puedes enviarlo al cliente fuera de la app). Sigue siendo <strong>editable</strong>; pulsa <em>✅ Marcar emitida</em> cuando sea definitiva (quedará inmutable).`
+            : `Borrador <strong>sin número fiscal</strong>. Edítalo libremente. Pulsa <em>🔢 Asignar número</em> si necesitas enviarlo fuera de la app, o <em>✅ Marcar emitida</em> para asignar número y congelarla.`;
         if (factHeader) factHeader.insertAdjacentHTML('beforeend',
-            `<div id="avisoEstadoFact" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">Borrador <strong>sin número fiscal</strong>. Edítalo libremente; pulsa <em>✅ Emitir factura</em> para asignarle número (quedará definitiva e inmutable).</div>`);
+            `<div id="avisoEstadoFact" class="no-print" style="background:#fff3e0; border-left:4px solid #e67e22; padding:8px 12px; margin-top:10px; font-size:0.85em; color:#7f8c8d;">${avisoHtml}</div>`);
     }
 
     // Si es una refactura (la OT tuvo una factura anterior rectificada), mostrar el origen
@@ -165,7 +175,7 @@ let lineasRect = [];
 
 function abrirRectificar() {
     const numActual = document.getElementById('factNumero').innerText;
-    if (!window._facturaActualId || numActual.includes('asignará')) {
+    if (!window._facturaActualId || numActual.includes('sin número')) {
         alert('❌ Guarda primero la factura antes de rectificarla.');
         return;
     }
@@ -377,13 +387,15 @@ async function verRectificativa(facturaId) {
         }
     }
 
-    // Botones en modo rectificativa: una rectificativa es EMITIDA → sin "Emitir", sin "Rectificar".
+    // Botones en modo rectificativa: una rectificativa es EMITIDA → sin "Emitir", "Asignar nº" ni "Rectificar".
     const btnRect    = document.getElementById('btnRectificarFact');
     const btnEmitir  = document.getElementById('btnEmitirFact');
-    const btnGuardar = document.querySelector('#modalFactura [onclick="guardarCambiosFactura()"]');
-    if (btnRect)   btnRect.style.display = 'none';
-    if (btnEmitir) btnEmitir.style.display = 'none';
-    if (btnGuardar) { btnGuardar.style.display = 'none'; }
+    const btnAsignar = document.getElementById('btnAsignarNumFact');
+    const btnGuardar = document.getElementById('btnGuardarBorrador');
+    if (btnRect)    btnRect.style.display = 'none';
+    if (btnEmitir)  btnEmitir.style.display = 'none';
+    if (btnAsignar) btnAsignar.style.display = 'none';
+    if (btnGuardar) btnGuardar.style.display = 'none';
 
     abrirModal('modalFactura');
 }
@@ -579,9 +591,30 @@ async function guardarCambiosFactura() {
     }
 }
 
-/** Emite la factura: asigna número correlativo y la congela (estado EMITIDA). */
+/** Asigna número fiscal SIN congelar: la factura sigue editable (BORRADOR con número). */
+async function asignarNumeroFactura() {
+    if (window._modoRectificativa) return;
+    if (!confirm('¿Asignar número de factura ahora?\n\nRecibirá su número correlativo pero SEGUIRÁ SIENDO EDITABLE (no se congela). Úsalo si necesitas enviarla al cliente fuera de la app antes de darla por definitiva.\n\nCuando sea definitiva, pulsa "✅ Marcar emitida".')) return;
+    try {
+        const base  = parseFloat(document.getElementById('factBase').innerText);
+        const iva   = parseFloat(document.getElementById('factIva').innerText);
+        const total = parseFloat(document.getElementById('factTotal').innerText);
+        const data = await API.post('/api/factura/asignar-numero', {
+            ot_id: otActualId, base_imponible: base, iva, total, lineas: lineasFactura
+        });
+        if (data.error) { alert('❌ ' + data.error); return; }
+        const frescas = await API.get('/api/ot');
+        if (Array.isArray(frescas)) otsGlobal = frescas;
+        alert(`🔢 Número asignado: ${data.numero_factura}\n\nLa factura sigue editable. Cuando sea definitiva, pulsa "✅ Marcar emitida".`);
+        if (otsGlobal.find(o => o.id === otActualId)) abrirGeneradorFactura(otActualId);
+    } catch (e) {
+        alert('❌ Error al asignar número: ' + e.message);
+    }
+}
+
+/** Marca la factura como EMITIDA: asigna número si no tiene y la congela (inmutable). */
 async function emitirFactura() {
-    if (!confirm('¿Emitir la factura?\n\nSe le asignará un número definitivo y quedará INMUTABLE: no se podrá editar ni borrar, solo corregir mediante una rectificativa (abono).')) return;
+    if (!confirm('¿Marcar la factura como EMITIDA?\n\nQuedará DEFINITIVA e INMUTABLE: no se podrá editar ni borrar, solo corregir mediante una rectificativa (abono). Si todavía no tiene número, se le asignará el siguiente correlativo.')) return;
     try {
         const base  = parseFloat(document.getElementById('factBase').innerText);
         const iva   = parseFloat(document.getElementById('factIva').innerText);
