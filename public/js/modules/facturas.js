@@ -518,10 +518,10 @@ function renderizarTablaFactura() {
         const t = l.cantidad * l.precio;
         base += t;
         tbody.innerHTML += `<tr>
-            <td><input type="text"   value="${l.concepto}"  onchange="actualizarLinea(${idx},'concepto',this.value)"></td>
+            <td><input class="conc-input" type="text" value="${escapeHTML(l.concepto)}" title="${escapeHTML(l.concepto)}" onchange="actualizarLinea(${idx},'concepto',this.value)"><span class="conc-print">${escapeHTML(l.concepto)}</span></td>
             <td><input type="number" step="0.1"  value="${l.cantidad}" onchange="actualizarLinea(${idx},'cantidad',this.value)"></td>
             <td><input type="number" step="0.01" value="${l.precio}"   onchange="actualizarLinea(${idx},'precio',this.value)"></td>
-            <td style="text-align:right;">${t.toFixed(2)} €</td>
+            <td class="celda-total" style="text-align:right;">${t.toFixed(2)} €</td>
             <td class="no-print"><button class="btn-peligro" onclick="borrarLineaFactura(${idx})">🗑️</button></td>
         </tr>`;
     });
