@@ -67,6 +67,8 @@
    Al activar body.imprimir-factura se oculta todo menos el modal de factura,
    que se saca del overlay y se imprime como página normal. */
 @media print {
+    /* margin:0 en la página → el navegador NO imprime cabecera/pie (URL, fecha, nº de página, título) */
+    @page { margin: 0; }
     body.imprimir-factura { background: #fff !important; margin: 0 !important; }
     body.imprimir-factura > *:not(#modalFactura) { display: none !important; }
     body.imprimir-factura #modalFactura {
@@ -75,7 +77,7 @@
         width: auto !important; height: auto !important; overflow: visible !important;
     }
     body.imprimir-factura #modalFactura .modal-content-folio {
-        box-shadow: none !important; margin: 0 !important; padding: 0 !important;
+        box-shadow: none !important; margin: 0 !important; padding: 14mm !important;
         max-width: 100% !important; width: 100% !important; min-height: 0 !important;
     }
     body.imprimir-factura .no-print { display: none !important; }

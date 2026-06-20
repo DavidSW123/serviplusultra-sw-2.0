@@ -683,38 +683,75 @@ async function _prepararClonFactura() {
     return { clon, cleanup };
 }
 
+/** Nombre de archivo basado en el número de factura: "Factura-36-20260620". */
+function _numFacturaArchivo() {
+    const n = (document.getElementById('factNumero').innerText || '').trim();
+    if (!n || n.includes('—') || n.toLowerCase().includes('sin')) return 'Factura';
+    return 'Factura-' + n.replace(/[^\w-]/g, '');
+}
+
+/** ¿El canvas salió prácticamente en blanco? (para detectar fallos de html2canvas) */
+function _canvasEnBlanco(canvas) {
+    try {
+        const ctx = canvas.getContext('2d');
+        let noBlancos = 0;
+        for (let y = 0; y < canvas.height; y += 17)
+            for (let x = 0; x < canvas.width; x += 17) {
+                const p = ctx.getImageData(x, y, 1, 1).data;
+                if (!(p[0] > 245 && p[1] > 245 && p[2] > 245)) { if (++noBlancos > 30) return false; }
+            }
+        return true;
+    } catch (_) { return false; }   // ante la duda, asumir que NO está en blanco
+}
+
 /**
- * Genera el PDF mediante la IMPRESIÓN NATIVA del navegador (window.print →
- * "Guardar como PDF" / "Microsoft Print to PDF"). Es el método FIABLE: usa el
- * motor del navegador, no html2canvas, así que nunca sale en blanco y el texto
- * sale vectorial (nítido y seleccionable). Aísla la factura con body.imprimir-factura.
+ * Imprime la factura con el motor nativo del navegador (window.print → "Guardar
+ * como PDF"). FIABLE (nunca en blanco, texto vectorial), pero NO aparece en la
+ * lista de descargas. Se usa como respaldo si la descarga directa fallara.
+ * Pone el nombre de la factura como título → nombre por defecto al guardar.
  */
 function imprimirFacturaPDF() {
+    const tituloPrevio = document.title;
+    document.title = _numFacturaArchivo();
     document.body.classList.add('imprimir-factura');
     const limpiar = () => {
         document.body.classList.remove('imprimir-factura');
+        document.title = tituloPrevio;
         window.removeEventListener('afterprint', limpiar);
     };
     window.addEventListener('afterprint', limpiar);
-    // respiro para que se apliquen los estilos de impresión antes de abrir el diálogo
     setTimeout(() => window.print(), 80);
 }
 
-/** Descarga el PDF de la factura vía html2canvas (alternativa; puede fallar en algunos navegadores). */
+/**
+ * Descarga directa del PDF (aparece en la lista de descargas de Chrome, con el
+ * nombre de la factura). Genera primero el canvas y, si saliera en blanco
+ * (fallo de html2canvas en algunos equipos), recurre a la impresión nativa.
+ */
 async function descargarFacturaPDF() {
-    const numFactura = document.getElementById('factNumero').innerText;
+    const opts = {
+        margin:      10,
+        filename:    _numFacturaArchivo() + '.pdf',
+        image:       { type: 'jpeg', quality: 0.98 },
+        html2canvas: _OPC_HTML2CANVAS,
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
     let prep;
     try {
         prep = await _prepararClonFactura();
-        await html2pdf().set({
-            margin:      10,
-            filename:    `Factura-${numFactura}.pdf`,
-            image:       { type: 'jpeg', quality: 0.98 },
-            html2canvas: _OPC_HTML2CANVAS,
-            jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(prep.clon).save();
+        // 1) Render de prueba: comprobar que el contenido NO sale en blanco.
+        const canvas = await html2pdf().set(opts).from(prep.clon).toCanvas().get('canvas');
+        if (_canvasEnBlanco(canvas)) {
+            prep.cleanup(); prep = null;
+            imprimirFacturaPDF();   // respaldo fiable
+            return;
+        }
+        // 2) Descarga real (lista de descargas de Chrome + nombre de la factura).
+        await html2pdf().set(opts).from(prep.clon).save();
     } catch (e) {
-        alert('❌ No se pudo generar el PDF (' + (e && e.message ? e.message : e) + '). Inténtalo de nuevo; si persiste, prueba con otro navegador.');
+        if (prep) { prep.cleanup(); prep = null; }
+        imprimirFacturaPDF();       // respaldo ante cualquier error
+        return;
     } finally {
         if (prep) prep.cleanup();
     }
