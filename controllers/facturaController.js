@@ -676,33 +676,46 @@ function _construirPdfFactura(doc, d) {
         FREG = 'Lato'; FBOLD = 'Lato-Bold';
     } catch (_) {}
 
-    // ── Logo (arriba izquierda) ──
-    let logoBottom = M + 50;
+    // ── Bloque IZQUIERDO centrado: logo + nombre + barra teal + CIF/dirección ──
+    const colW = 255, cx = M + colW / 2;             // columna izquierda y su eje central
+    let logoBottom = M + 60;
     try {
         const img = doc.openImage(path.join(__dirname, '..', 'public', 'logo.png'));
-        const lw = 150, lh = img.height * (lw / img.width);
-        doc.image(img, M, M, { width: lw });
+        const lw = 165, lh = img.height * (lw / img.width);
+        doc.image(img, cx - lw / 2, M, { width: lw });   // logo CENTRADO en la columna
         logoBottom = M + lh;
     } catch (_) {}
 
-    // ── "FACTURA" + datos (arriba derecha, con línea teal) ──
+    // ── "FACTURA" + datos (arriba derecha). Nº naranja si es rectificativa, turquesa si es normal ──
     doc.fillColor(teal).font(FBOLD).fontSize(26).text('FACTURA', M, M + 2, { width: right - M, align: 'right' });
     const facY = M + 34;
     doc.moveTo(right - 200, facY).lineTo(right, facY).lineWidth(2).strokeColor(teal).stroke();
-    doc.font(FREG).fontSize(10).fillColor(dark);
-    doc.text(`Nº de Factura: ${d.numero || '—'}`,  M, facY + 8, { width: right - M, align: 'right' });
-    doc.text(`Ref. OT: ${d.otCode || '—'}`,         M, doc.y,    { width: right - M, align: 'right' });
-    doc.text(`Fecha de emisión: ${d.fecha || '—'}`, M, doc.y,    { width: right - M, align: 'right' });
-    const derEnd = doc.y;
+    const esRect   = /^\s*R-/i.test(String(d.numero || ''));
+    const numColor = esRect ? '#e67e22' : teal;
+    // Cada dato a la derecha: etiqueta (negrita) + valor (color), posicionado a mano
+    // para que la línea quede pegada al margen derecho sin solaparse.
+    const _dato = (yy, label, valor, fVal, colVal, size) => {
+        doc.fontSize(size);
+        const wL = doc.font(FBOLD).widthOfString(label);
+        const wV = doc.font(fVal).widthOfString(valor);
+        const sx = right - (wL + wV);
+        doc.font(FBOLD).fillColor(dark).text(label, sx, yy, { lineBreak: false });
+        doc.font(fVal).fillColor(colVal).text(valor, sx + wL, yy, { lineBreak: false });
+    };
+    _dato(facY + 8,  'Nº de Factura: ',    String(d.numero || '—'), FBOLD, numColor, 11);
+    _dato(facY + 26, 'Ref. OT: ',          String(d.otCode || '—'), FREG,  '#555', 10);
+    _dato(facY + 41, 'Fecha de emisión: ', String(d.fecha  || '—'), FREG,  '#555', 10);
+    const derEnd = facY + 55;
 
-    // ── Datos de empresa (izquierda, BAJO el logo, con línea teal) ──
-    let yIzq = logoBottom + 16;
-    doc.font(FBOLD).fontSize(13).fillColor(dark).text('ServiPlusUltra Solutions S.L.', M, yIzq, { width: 250 });
+    // ── Nombre de empresa (GRANDE y centrado) + barra teal del ancho del nombre ──
+    const nombreEmp = 'ServiPlusUltra Solutions S.L.';
+    doc.font(FBOLD).fontSize(15).fillColor(dark).text(nombreEmp, M, logoBottom + 10, { width: colW, align: 'center' });
     const nameBottom = doc.y;
-    doc.moveTo(M, nameBottom + 3).lineTo(M + 220, nameBottom + 3).lineWidth(2).strokeColor(teal).stroke();
-    doc.font(FREG).fontSize(9).fillColor(grey)
-       .text('B-26892760', M, nameBottom + 8)
-       .text("Carrer d'Aribau 168, 1-1, 08036 BCN", M, doc.y);
+    const nameW = Math.min(doc.widthOfString(nombreEmp), colW);
+    doc.moveTo(cx - nameW / 2, nameBottom + 4).lineTo(cx + nameW / 2, nameBottom + 4).lineWidth(2.5).strokeColor(teal).stroke();
+    doc.font(FREG).fontSize(10).fillColor(grey)
+       .text('B-26892760', M, nameBottom + 12, { width: colW, align: 'center' })
+       .text("Carrer d'Aribau 168, 1-1, 08036 BCN", M, doc.y, { width: colW, align: 'center' });
     const izqEnd = doc.y;
 
     // ── Caja de cliente (derecha) ──
