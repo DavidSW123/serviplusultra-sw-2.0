@@ -58,6 +58,7 @@ router.delete('/ot/adjuntos/:id',          soloAdmin,      otController.deleteAd
 router.post  ('/factura',                    autenticado, facturaController.emitir);
 router.post  ('/factura/borrador',           autenticado, facturaController.guardarBorrador);
 router.post  ('/factura/asignar-numero',     autenticado, facturaController.asignarNumero);
+router.post  ('/factura/pdf',                autenticado, facturaController.generarPdf);
 router.post  ('/factura/lineas',             autenticado, facturaController.actualizarLineas);
 router.post  ('/factura/desde-presupuesto',  autenticado, facturaController.emitirDesdePresupuesto);
 router.post  ('/facturas/purgar-huerfanas',  soloAdmin,   facturaController.purgarHuerfanas);

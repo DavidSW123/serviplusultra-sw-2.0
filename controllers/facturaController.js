@@ -1,4 +1,6 @@
 const QRCode    = require('qrcode');
+const PDFDocument = require('pdfkit');
+const path      = require('path');
 const { errorServidor } = require('../utils/responder');
 const { db }    = require('../config/db');
 
@@ -655,4 +657,127 @@ async function reasignarNumero(req, res) {
     }
 }
 
-module.exports = { emitir, guardarBorrador, asignarNumero, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero };
+// ============================================================
+// PDF DE FACTURA GENERADO EN SERVIDOR (fiable; nunca sale en blanco)
+// ============================================================
+const _eur = n => (Number(n) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+/** Dibuja la factura en el documento pdfkit a partir de los datos del modal. */
+function _construirPdfFactura(doc, d) {
+    const M = 40, right = doc.page.width - M;
+    const teal = '#1abc9c', dark = '#2c3e50', grey = '#7f8c8d';
+
+    // Logo (si existe)
+    try { doc.image(path.join(__dirname, '..', 'public', 'logo.png'), M, M, { width: 150 }); } catch (_) {}
+
+    // Título + datos de la factura (derecha)
+    doc.fillColor(teal).font('Helvetica-Bold').fontSize(26).text('FACTURA', M, M + 4, { width: right - M, align: 'right' });
+    doc.font('Helvetica').fontSize(10).fillColor(dark);
+    doc.text(`Nº de Factura: ${d.numero || '—'}`,  M, M + 40, { width: right - M, align: 'right' });
+    doc.text(`Ref. OT: ${d.otCode || '—'}`,         M, doc.y,   { width: right - M, align: 'right' });
+    doc.text(`Fecha de emisión: ${d.fecha || '—'}`, M, doc.y,   { width: right - M, align: 'right' });
+
+    // Datos de empresa (izquierda, bajo el logo)
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(dark).text('ServiPlusUltra Solutions S.L.', M, M + 64);
+    doc.font('Helvetica').fontSize(9).fillColor(grey)
+       .text('B-26892760', M, doc.y + 2)
+       .text("Carrer d'Aribau 168, 1-1, 08036 BCN", M, doc.y);
+
+    // Caja de cliente (derecha)
+    const cli = d.cliente || {};
+    const bw = 250, bx = right - bw, by = M + 100;
+    let bh = 40;
+    doc.font('Helvetica').fontSize(8.5);
+    if (cli.nif) bh += 12;
+    if (cli.direccion) bh += doc.heightOfString('Dir: ' + cli.direccion, { width: bw - 20 });
+    doc.save().roundedRect(bx, by, bw, bh, 4).fill('#f0f4f8').restore();
+    doc.fillColor(dark).font('Helvetica-Bold').fontSize(9).text('Facturar a:', bx + 10, by + 8, { width: bw - 20 });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(dark).text(cli.nombre || 'Consumidor Final', bx + 10, doc.y + 1, { width: bw - 20 });
+    doc.font('Helvetica').fontSize(8.5).fillColor('#555');
+    if (cli.nif)       doc.text(`NIF/CIF: ${cli.nif}`, bx + 10, doc.y + 2, { width: bw - 20 });
+    if (cli.direccion) doc.text(`Dir: ${cli.direccion}`, bx + 10, doc.y, { width: bw - 20 });
+
+    // Línea divisoria
+    let y = Math.max(M + 132, by + bh + 18);
+    doc.moveTo(M, y).lineTo(right, y).lineWidth(1).strokeColor(dark).stroke();
+    y += 12;
+
+    // Cabecera de la tabla
+    const cCon = M, cCant = 300, cPre = 360;
+    const wCon = cCant - cCon - 10;
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(dark);
+    doc.text('Concepto', cCon, y, { width: wCon });
+    doc.text('Cant.', cCant, y, { width: 50 });
+    doc.text('Precio/U (€)', cPre, y, { width: 90 });
+    doc.text('Total', right - 100, y, { width: 100, align: 'right' });
+    y += 15;
+    doc.moveTo(M, y).lineTo(right, y).lineWidth(1).strokeColor(dark).stroke();
+    y += 8;
+
+    // Filas (concepto ENVUELVE; total nunca se parte)
+    (d.lineas || []).forEach(l => {
+        const cant = Number(l.cantidad) || 0, precio = Number(l.precio) || 0;
+        const concepto = String(l.concepto || '');
+        doc.font('Helvetica').fontSize(10);
+        const hCon = doc.heightOfString(concepto, { width: wCon });
+        const rowH = Math.max(hCon, 13) + 9;
+        if (y + rowH > doc.page.height - 140) { doc.addPage(); y = M; }
+        doc.fillColor('#000').font('Helvetica').fontSize(10);
+        doc.text(concepto, cCon, y, { width: wCon });
+        doc.text(String(cant), cCant, y, { width: 50 });
+        doc.text(String(precio), cPre, y, { width: 90 });
+        doc.text(_eur(cant * precio), right - 100, y, { width: 100, align: 'right' });
+        y += rowH;
+        doc.moveTo(M, y - 5).lineTo(right, y - 5).lineWidth(0.5).strokeColor('#e5e5e5').stroke();
+    });
+
+    // QR (izquierda) + caja de totales (derecha)
+    y += 18;
+    if (y > doc.page.height - 130) { doc.addPage(); y = M; }
+    if (d.qr_data && String(d.qr_data).includes(',')) {
+        try { doc.image(Buffer.from(String(d.qr_data).split(',')[1], 'base64'), M, y, { width: 95 }); } catch (_) {}
+    }
+    const tw = 210, tx = right - tw;
+    doc.save().roundedRect(tx, y, tw, 74, 4).fill('#f8f9fa').restore();
+    doc.fillColor(dark).font('Helvetica').fontSize(10).text('Base:', tx + 12, y + 10);
+    doc.font('Helvetica-Bold').text(_eur(d.base), tx + tw - 110, y + 10, { width: 98, align: 'right' });
+    doc.font('Helvetica').fillColor(dark).text('IVA (21%):', tx + 12, y + 28);
+    doc.font('Helvetica-Bold').text(_eur(d.iva), tx + tw - 110, y + 28, { width: 98, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(teal).text('Total:', tx + 12, y + 48);
+    doc.text(_eur(d.total), tx + tw - 110, y + 47, { width: 98, align: 'right' });
+}
+
+/** Genera el PDF en memoria y lo resuelve como Buffer. */
+function _pdfFacturaBuffer(d) {
+    return new Promise((resolve, reject) => {
+        try {
+            const doc = new PDFDocument({ size: 'A4', margin: 40 });
+            const chunks = [];
+            doc.on('data', c => chunks.push(c));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+            _construirPdfFactura(doc, d);
+            doc.end();
+        } catch (e) { reject(e); }
+    });
+}
+
+/**
+ * POST /api/factura/pdf
+ * Body: { numero, fecha, otCode, cliente:{nombre,nif,direccion}, lineas, base, iva, total, qr_data }
+ * Genera el PDF de la factura en el servidor (fiable) y lo devuelve como descarga.
+ */
+async function generarPdf(req, res) {
+    try {
+        const d = req.body || {};
+        const buf = await _pdfFacturaBuffer(d);
+        const base = (d.numero && !/sin|—/i.test(String(d.numero))) ? `Factura-${String(d.numero).replace(/[^\w-]/g, '')}` : 'Factura';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${base}.pdf"`);
+        res.send(buf);
+    } catch (e) {
+        errorServidor(res, e, 'generarPdf');
+    }
+}
+
+module.exports = { emitir, guardarBorrador, asignarNumero, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero, generarPdf };
