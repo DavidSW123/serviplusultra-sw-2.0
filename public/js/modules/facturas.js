@@ -131,8 +131,19 @@ async function abrirGeneradorFactura(id) {
         if (btnGuardar) btnGuardar.style.display = 'none';
         if (btnAsignar) btnAsignar.style.display = 'none';
         if (btnEmitir)  btnEmitir.style.display = 'none';
-        if (wrap) wrap.insertAdjacentHTML('beforeend',
-            `<span id="tagEstadoFact" class="fact-pill fact-pill-green fact-pill-static" title="Factura definitiva e inmutable">✅ EMITIDA</span>`);
+        let yaEnviada = false;
+        try { yaEnviada = JSON.parse(ot.factura_emails_enviados || '[]').length > 0; } catch (_) {}
+        if (wrap) {
+            if (yaEnviada) {
+                // Ya hay envío registrado → badge estática (el badge "📧 Enviada" muestra el historial)
+                wrap.insertAdjacentHTML('beforeend',
+                    `<span id="tagEstadoFact" class="fact-pill fact-pill-green fact-pill-static" title="Factura definitiva e inmutable">✅ EMITIDA</span>`);
+            } else {
+                // Sin envío registrado (p.ej. enviada a mano) → clicable para registrar cuándo/a quién
+                wrap.insertAdjacentHTML('beforeend',
+                    `<span id="tagEstadoFact" class="fact-pill fact-pill-green" style="cursor:pointer;" onclick="abrirRegistrarEnvioDesdeModal()" title="Click para registrar el envío al cliente (si la enviaste fuera de la app)">✅ EMITIDA · registrar envío</span>`);
+            }
+        }
     } else {
         // BORRADOR (con o sin número): editable. Sin email/rectificar hasta emitir.
         if (btnEmail) btnEmail.style.display = 'none';
@@ -332,6 +343,11 @@ function verRectDesdeLista(id) {
 
 // ── Registro de envío manual (cuándo y a quién) al marcar emitida ──
 let _regEnvioFacturaId = null;
+/** Abre el registro de envío para la factura actual del modal (cliente seleccionado). */
+function abrirRegistrarEnvioDesdeModal() {
+    const cli = clientesGlobal.find(c => c.id == document.getElementById('selClienteFactura').value);
+    abrirRegistrarEnvio(window._facturaActualId, cli ? cli.email : '');
+}
 function abrirRegistrarEnvio(facturaId, emailCliente) {
     if (!facturaId) return;
     _regEnvioFacturaId = facturaId;
@@ -350,7 +366,21 @@ async function confirmarRegistrarEnvio() {
     const fecha    = fechaRaw ? new Date(fechaRaw).toLocaleString('es-ES') : new Date().toLocaleString('es-ES');
     try {
         const r = await API.post(`/api/factura/${_regEnvioFacturaId}/registrar-envio`, { email, fecha });
-        if (r && r.ok) _renderBadgeEnviada(JSON.stringify(r.emails_enviados));
+        if (r && r.ok) {
+            _renderBadgeEnviada(JSON.stringify(r.emails_enviados));
+            // La badge EMITIDA deja de ser "registrar envío" (ya hay envío registrado)
+            const tag = document.getElementById('tagEstadoFact');
+            if (tag && tag.innerText.includes('registrar')) {
+                tag.classList.add('fact-pill-static');
+                tag.style.cursor = '';
+                tag.onclick = null;
+                tag.removeAttribute('onclick');
+                tag.innerText = '✅ EMITIDA';
+                tag.title = 'Factura definitiva e inmutable';
+            }
+            // Refrescar otsGlobal para que el estado persista al reabrir
+            try { const fr = await API.get('/api/ot'); if (Array.isArray(fr)) otsGlobal = fr; } catch (_) {}
+        }
         cerrarModal('modalRegistrarEnvio');
     } catch (e) {
         alert('❌ No se pudo registrar el envío: ' + (e.message || e));
