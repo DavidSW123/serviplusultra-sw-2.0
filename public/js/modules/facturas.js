@@ -72,6 +72,7 @@ async function abrirGeneradorFactura(id) {
     otActualId     = ot.id;
     otActualCodigo = ot.codigo_ot;
     window._modoRectificativa = false;
+    window._volverAListaRect  = false;   // es una factura normal, no abierta desde el listado de rectificativas
     document.getElementById('factNumero').style.color  = ot.numero_factura ? '#1abc9c' : '#aaa';
 
     document.getElementById('factOtCode').innerText    = ot.codigo_ot;
@@ -314,6 +315,56 @@ if (typeof window !== 'undefined') {
     setInterval(_actualizarBadgeSolicitudesElim, 60000);
 }
 
+/** Cierra el modal de factura; si veníamos del listado de rectificativas, vuelve a él. */
+function cerrarModalFactura() {
+    cerrarModal('modalFactura');
+    if (window._volverAListaRect) {
+        window._volverAListaRect = false;
+        verListaRectificativas();
+    }
+}
+
+/** Abre una rectificativa DESDE el listado (recordando que hay que volver a él al cerrar). */
+function verRectDesdeLista(id) {
+    window._volverAListaRect = true;
+    verRectificativa(id);
+}
+
+// ── Registro de envío manual (cuándo y a quién) al marcar emitida ──
+let _regEnvioFacturaId = null;
+function abrirRegistrarEnvio(facturaId, emailCliente) {
+    if (!facturaId) return;
+    _regEnvioFacturaId = facturaId;
+    const elEmail = document.getElementById('regEnvioEmail');
+    const elFecha = document.getElementById('regEnvioFecha');
+    if (!elEmail || !elFecha) return;   // si el modal no está en esta página, no molestar
+    elEmail.value = emailCliente || '';
+    const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    elFecha.value = now.toISOString().slice(0, 16);
+    abrirModal('modalRegistrarEnvio');
+}
+async function confirmarRegistrarEnvio() {
+    if (!_regEnvioFacturaId) { cerrarModal('modalRegistrarEnvio'); return; }
+    const email    = document.getElementById('regEnvioEmail').value.trim();
+    const fechaRaw = document.getElementById('regEnvioFecha').value;
+    const fecha    = fechaRaw ? new Date(fechaRaw).toLocaleString('es-ES') : new Date().toLocaleString('es-ES');
+    try {
+        const r = await API.post(`/api/factura/${_regEnvioFacturaId}/registrar-envio`, { email, fecha });
+        if (r && r.ok) _renderBadgeEnviada(JSON.stringify(r.emails_enviados));
+        cerrarModal('modalRegistrarEnvio');
+    } catch (e) {
+        alert('❌ No se pudo registrar el envío: ' + (e.message || e));
+    }
+}
+
+// Cerrar cualquier modal al hacer clic en el fondo (fuera del contenido)
+document.addEventListener('click', function (e) {
+    if (e.target && e.target.classList && e.target.classList.contains('modal')) {
+        if (e.target.id === 'modalFactura') cerrarModalFactura();
+        else cerrarModal(e.target.id);
+    }
+});
+
 /** Listado global de facturas rectificativas. */
 async function verListaRectificativas() {
     const lista = await API.get('/api/facturas/rectificativas');
@@ -330,7 +381,7 @@ async function verListaRectificativas() {
                 <td>${escapeHTML(r.codigo_ot || r.presupuesto_ref || '—')}</td>
                 <td style="text-align:right;"><strong>${parseFloat(r.total||0).toFixed(2)} €</strong></td>
                 <td style="font-size:0.85em; color:#7f8c8d;">${escapeHTML((r.motivo_rectificacion||'').substring(0,60))}${(r.motivo_rectificacion||'').length>60?'...':''}</td>
-                <td><button class="btn-secundario" style="padding:5px 10px; font-size:0.85em;" onclick="verRectificativa(${r.id})">Ver</button></td>
+                <td><button class="btn-secundario" style="padding:5px 10px; font-size:0.85em;" onclick="verRectDesdeLista(${r.id})">Ver</button></td>
             </tr>
         `).join('');
     }
@@ -628,6 +679,9 @@ async function emitirFactura() {
         alert(`✅ Factura emitida: ${data.numero_factura}`);
         // Reabrir en estado EMITIDA para reflejar el cambio (congelada)
         if (otsGlobal.find(o => o.id === otActualId)) abrirGeneradorFactura(otActualId);
+        // Popup: registrar cuándo y a quién se envió (p.ej. si se manda fuera de la app)
+        const _cli = clientesGlobal.find(c => c.id == document.getElementById('selClienteFactura').value);
+        abrirRegistrarEnvio(window._facturaActualId, _cli ? _cli.email : '');
     } catch (e) {
         alert('❌ Error al emitir: ' + e.message);
     }
