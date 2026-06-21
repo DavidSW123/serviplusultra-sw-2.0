@@ -312,6 +312,28 @@ async function enviarEmail(req, res) {
 }
 
 /**
+ * POST /api/factura/:id/registrar-envio
+ * Body: { email, fecha }
+ * Registra en emails_enviados un envío hecho FUERA de la app (para el historial),
+ * sin enviar ningún correo. Útil al marcar emitida una factura ya enviada a mano.
+ */
+async function registrarEnvio(req, res) {
+    const { id } = req.params;
+    const { email, fecha } = req.body;
+    try {
+        const { rows } = await db.execute({ sql: 'SELECT emails_enviados FROM facturas WHERE id=?', args: [id] });
+        if (!rows[0]) return res.status(404).json({ error: 'Factura no encontrada.' });
+        let arr = [];
+        try { arr = JSON.parse(rows[0].emails_enviados || '[]'); } catch { arr = []; }
+        arr.push({ email: (email || '').trim() || '(sin email)', fecha: (fecha || '').trim() || new Date().toLocaleString('es-ES') });
+        await db.execute({ sql: 'UPDATE facturas SET emails_enviados=? WHERE id=?', args: [JSON.stringify(arr), id] });
+        res.json({ ok: true, emails_enviados: arr });
+    } catch (e) {
+        errorServidor(res, e, 'registrarEnvio');
+    }
+}
+
+/**
  * POST /api/test-email
  */
 async function testEmail(req, res) {
@@ -836,4 +858,4 @@ async function generarPdf(req, res) {
     }
 }
 
-module.exports = { emitir, guardarBorrador, asignarNumero, enviarEmail, testEmail, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero, generarPdf };
+module.exports = { emitir, guardarBorrador, asignarNumero, enviarEmail, testEmail, registrarEnvio, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero, generarPdf };
