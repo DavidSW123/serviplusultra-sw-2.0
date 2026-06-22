@@ -359,13 +359,18 @@ function abrirRegistrarEnvio(facturaId, emailCliente) {
     elFecha.value = now.toISOString().slice(0, 16);
     abrirModal('modalRegistrarEnvio');
 }
+let _regEnvioEnCurso = false;
 async function confirmarRegistrarEnvio() {
+    if (_regEnvioEnCurso) return;                 // anti doble-clic
     if (!_regEnvioFacturaId) { cerrarModal('modalRegistrarEnvio'); return; }
+    _regEnvioEnCurso = true;
+    const facturaId = _regEnvioFacturaId;
     const email    = document.getElementById('regEnvioEmail').value.trim();
     const fechaRaw = document.getElementById('regEnvioFecha').value;
     const fecha    = fechaRaw ? new Date(fechaRaw).toLocaleString('es-ES') : new Date().toLocaleString('es-ES');
+    cerrarModal('modalRegistrarEnvio');           // cerrar YA: evita reintentos por lentitud
     try {
-        const r = await API.post(`/api/factura/${_regEnvioFacturaId}/registrar-envio`, { email, fecha });
+        const r = await API.post(`/api/factura/${facturaId}/registrar-envio`, { email, fecha });
         if (r && r.ok) {
             _renderBadgeEnviada(JSON.stringify(r.emails_enviados));
             // La badge EMITIDA deja de ser "registrar envío" (ya hay envío registrado)
@@ -378,12 +383,14 @@ async function confirmarRegistrarEnvio() {
                 tag.innerText = '✅ EMITIDA';
                 tag.title = 'Factura definitiva e inmutable';
             }
-            // Refrescar otsGlobal para que el estado persista al reabrir
-            try { const fr = await API.get('/api/ot'); if (Array.isArray(fr)) otsGlobal = fr; } catch (_) {}
+            // Persistir en memoria sin refrescar todas las OTs (rápido): actualizar la OT actual
+            const otLocal = otsGlobal.find(o => o.id === otActualId);
+            if (otLocal) otLocal.factura_emails_enviados = JSON.stringify(r.emails_enviados);
         }
-        cerrarModal('modalRegistrarEnvio');
     } catch (e) {
         alert('❌ No se pudo registrar el envío: ' + (e.message || e));
+    } finally {
+        _regEnvioEnCurso = false;
     }
 }
 
