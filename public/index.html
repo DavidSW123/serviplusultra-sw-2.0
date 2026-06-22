@@ -23,11 +23,11 @@
 
     <div class="container no-print">
         <div class="top-bar">
-            <div style="display:flex; gap:10px;">
-                <a href="/" style="color:#7f8c8d; text-decoration:none; font-size:0.9em;">← Volver al inicio</a>
-                <a href="/bbdd" class="btn-secundario">🗄️ Abrir Base de Datos</a>
-                <button class="btn-secundario" onclick="verListaRectificativas()">📝 Rectificativas</button>
-                <button class="btn-secundario" id="btnSolicitudesElim" onclick="verSolicitudesEliminacion()" style="display:none; background:#e67e22; color:#fff;">⚠️ Solicitudes eliminación</button>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <a href="/" class="nav-link">←&nbsp;Volver al inicio</a>
+                <a href="/bbdd" class="nav-btn">🗄️ Abrir Base de Datos</a>
+                <button class="nav-btn" onclick="verListaRectificativas()">📝 Rectificativas</button>
+                <button class="nav-btn nav-btn-alert" id="btnSolicitudesElim" onclick="verSolicitudesEliminacion()" style="display:none;">⚠️ Solicitudes eliminación</button>
             </div>
             <div style="display: flex; align-items: center; gap: 15px;">
                 <div style="text-align: right; line-height: 1.2;">
