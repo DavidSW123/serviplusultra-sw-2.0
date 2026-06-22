@@ -16,6 +16,26 @@ input, select, textarea {
 }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 
+/* ── BOTONES DE NAVEGACIÓN (compartidos por todas las páginas) ── */
+.nav-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: #7f8c8d; text-decoration: none; font-size: 0.9em; font-weight: 600;
+    padding: 9px 12px; border-radius: 9px; transition: all 0.15s ease;
+}
+.nav-link:hover { color: #16a085; background: #eafaf6; }
+.nav-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #fff; color: #2c3e50; border: 1px solid #dfe6ec;
+    padding: 9px 16px; border-radius: 9px; cursor: pointer;
+    font-size: 0.9em; font-weight: 600; text-decoration: none; line-height: 1;
+    box-shadow: 0 1px 2px rgba(44,62,80,0.05); transition: all 0.15s ease;
+}
+.nav-btn:hover { border-color: #1abc9c; color: #16a085; box-shadow: 0 3px 10px rgba(26,188,156,0.18); transform: translateY(-1px); }
+.nav-btn-alert { border-color: #e67e22; color: #d35400; background: #fff8f1; }
+.nav-btn-alert:hover { background: #e67e22; color: #fff; border-color: #e67e22; box-shadow: 0 3px 10px rgba(230,126,34,0.25); }
+.nav-btn-green { border-color: #27ae60; color: #1e8449; background: #f2fbf5; }
+.nav-btn-green:hover { background: #27ae60; color: #fff; border-color: #27ae60; box-shadow: 0 3px 10px rgba(39,174,96,0.25); }
+
 /* ── UTILIDADES ─────────────────────────────────────────────── */
 .only-print { display: none; }
 

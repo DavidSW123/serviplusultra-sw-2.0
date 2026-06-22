@@ -24,7 +24,7 @@ document.getElementById('formLogin').addEventListener('submit', function(e) {
             errorBox.style.display = 'block';
             errorBox.innerText = data.error;
         } else {
-            localStorage.setItem('sesionPlusUltra', JSON.stringify({ username: data.username, rol: data.rol }));
+            localStorage.setItem('sesionPlusUltra', JSON.stringify({ username: data.username, rol: data.rol, foto: data.foto || '' }));
             window.location.href = '/';
         }
     })
