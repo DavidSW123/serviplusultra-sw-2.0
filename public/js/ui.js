@@ -29,6 +29,25 @@ function comprimirImagen(file, callback) {
     };
 }
 
+/** Sube la foto de perfil: comprime, guarda en BD y actualiza los avatares + sesión. */
+function subirFoto(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    comprimirImagen(file, async (dataUrl) => {
+        try {
+            const r = await API.put('/api/usuarios/foto', { username: sesion.username, foto: dataUrl });
+            if (r && r.error) { alert('❌ ' + r.error); return; }
+            sesion.foto = dataUrl;
+            try { localStorage.setItem('sesionPlusUltra', JSON.stringify(sesion)); } catch (_) {}
+            const top  = document.getElementById('topAvatar');  if (top)  top.src  = dataUrl;
+            const menu = document.getElementById('menuAvatar'); if (menu) menu.src = dataUrl;
+            alert('✅ Foto de perfil actualizada.');
+        } catch (e) {
+            alert('❌ No se pudo subir la foto: ' + (e.message || e));
+        }
+    });
+}
+
 function validarFormulario(codigo, fechaIn, fechaOut) {
     if (!codigo.startsWith(prefijoAnoActual)) { alert(`❌ Debe empezar por ${prefijoAnoActual}`); return false; }
     if (fechaOut && new Date(fechaOut) <= new Date(fechaIn)) { alert('❌ Finalización debe ser posterior al inicio.'); return false; }
@@ -43,6 +62,7 @@ function inicializarUI() {
     document.getElementById('menuNombre').innerText = sesion.username;
     document.getElementById('menuRol').innerText    = sesion.rol;
     document.getElementById('topAvatar').src        = sesion.foto || imgDefecto;
+    const _menuAv = document.getElementById('menuAvatar'); if (_menuAv) _menuAv.src = sesion.foto || imgDefecto;
     document.getElementById('codigo_ot').placeholder = `${prefijoAnoActual}00001`;
 
     if (sesion.rol === 'admin' || sesion.rol === 'director') {
