@@ -861,18 +861,23 @@ async function descargarFacturaPDF() {
 }
 
 async function enviarFacturaAlCliente() {
-    // Si todavía es un borrador (no rectificativa), no se envía: hay que emitir primero.
-    if (!window._modoRectificativa && window._facturaEstadoActual !== 'EMITIDA') {
-        alert('⚠️ Esta factura todavía es un BORRADOR.\n\nPulsa primero "✅ Marcar emitida" para asignarle su número definitivo; después podrás enviarla al cliente.');
-        return;
-    }
     const idCliente = document.getElementById('selClienteFactura').value;
     if (!idCliente) { alert('❌ Selecciona un cliente primero.'); return; }
     const cliente = clientesGlobal.find(c => c.id == idCliente);
     if (!cliente.email || !cliente.email.includes('@')) { alert('❌ El cliente no tiene un email válido.'); return; }
-    if (!confirm(`¿Enviar PDF a ${cliente.email}?`)) return;
+
+    // Enviar por la app EMITE la factura automáticamente (número definitivo + inmutable) y la manda.
+    // "Marcar emitida" queda para cuando se envía por fuera de la app.
+    const esBorrador = !window._modoRectificativa && window._facturaEstadoActual !== 'EMITIDA';
+    const msg = esBorrador
+        ? `Se EMITIRÁ la factura (número definitivo, queda inmutable) y se enviará a ${cliente.email}.\n\n¿Continuar?`
+        : `¿Enviar la factura a ${cliente.email}?`;
+    if (!confirm(msg)) return;
 
     alert('⏳ Generando PDF y enviando...');
+    if (!window._modoRectificativa) {
+        try { await _emitirYRegistrar(); } catch (e) { alert('❌ ' + e.message); return; }
+    }
 
     const numFactura = document.getElementById('factNumero').innerText;
     try {
