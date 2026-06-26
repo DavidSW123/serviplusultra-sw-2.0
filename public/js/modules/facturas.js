@@ -125,6 +125,7 @@ async function abrirGeneradorFactura(id) {
     const estado   = ot.factura_estado || (ot.numero_factura ? 'EMITIDA' : 'BORRADOR');
     const tieneNum = !!ot.numero_factura;
     const wrap     = document.getElementById('factBadgesWrap');
+    window._facturaEstadoActual = estado;   // lo usa "Enviar por Email" para avisar si es borrador
 
     if (estado === 'EMITIDA') {
         // Factura definitiva: congelada. Solo PDF, enviar y rectificar.
@@ -145,8 +146,8 @@ async function abrirGeneradorFactura(id) {
             }
         }
     } else {
-        // BORRADOR (con o sin número): editable. Sin email/rectificar hasta emitir.
-        if (btnEmail) btnEmail.style.display = 'none';
+        // BORRADOR (con o sin número): editable. El botón "Enviar por Email" se VE,
+        // pero al pulsarlo avisa de que primero hay que marcar emitida. Sin rectificar.
         if (btnRect)  btnRect.style.display = 'none';
         // "Asignar número" solo si todavía no lo tiene
         if (btnAsignar) btnAsignar.style.display = tieneNum ? 'none' : '';
@@ -436,6 +437,7 @@ async function verRectificativa(facturaId) {
 
     // Modo rectificativa: marcamos flag y cargamos en el modal estándar
     window._modoRectificativa = true;
+    window._facturaEstadoActual = 'EMITIDA';   // una rectificativa ya está emitida → se puede enviar
     window._facturaActualId   = f.id;
     otActualId     = f.ot_id || null;
     otActualCodigo = f.codigo_ot || f.presupuesto_ref || '—';
@@ -859,6 +861,11 @@ async function descargarFacturaPDF() {
 }
 
 async function enviarFacturaAlCliente() {
+    // Si todavía es un borrador (no rectificativa), no se envía: hay que emitir primero.
+    if (!window._modoRectificativa && window._facturaEstadoActual !== 'EMITIDA') {
+        alert('⚠️ Esta factura todavía es un BORRADOR.\n\nPulsa primero "✅ Marcar emitida" para asignarle su número definitivo; después podrás enviarla al cliente.');
+        return;
+    }
     const idCliente = document.getElementById('selClienteFactura').value;
     if (!idCliente) { alert('❌ Selecciona un cliente primero.'); return; }
     const cliente = clientesGlobal.find(c => c.id == idCliente);
@@ -866,9 +873,6 @@ async function enviarFacturaAlCliente() {
     if (!confirm(`¿Enviar PDF a ${cliente.email}?`)) return;
 
     alert('⏳ Generando PDF y enviando...');
-    if (!window._modoRectificativa) {
-        try { await _emitirYRegistrar(); } catch (e) { alert('❌ ' + e.message); return; }
-    }
 
     const numFactura = document.getElementById('factNumero').innerText;
     try {
