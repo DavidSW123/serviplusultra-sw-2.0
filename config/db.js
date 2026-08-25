@@ -69,7 +69,7 @@ async function inicializarDB() {
             concepto  TEXT,
             importe   REAL,
             fecha     TEXT,
-            implicados TEXT DEFAULT 'Giancarlo,David,Kevin'
+            implicados TEXT DEFAULT 'Juliana,David,Guille'
         )`);
 
         await db.execute(`CREATE TABLE IF NOT EXISTS stock_materiales (
@@ -111,7 +111,7 @@ async function inicializarDB() {
         const migraciones = [
             `ALTER TABLE ordenes_trabajo ADD COLUMN cliente_id INTEGER`,
             `ALTER TABLE ordenes_trabajo ADD COLUMN tecnicos_nombres TEXT DEFAULT ''`,
-            `ALTER TABLE gastos_socios ADD COLUMN implicados TEXT DEFAULT 'Giancarlo,David,Kevin'`,
+            `ALTER TABLE gastos_socios ADD COLUMN implicados TEXT DEFAULT 'Juliana,David,Guille'`,
             `UPDATE usuarios SET rol = 'admin' WHERE username = 'David' AND rol = 'director'`,
             `ALTER TABLE ordenes_trabajo ADD COLUMN precio_hora REAL DEFAULT 15`,
             `ALTER TABLE facturas ADD COLUMN numero_factura TEXT`,
@@ -145,7 +145,10 @@ async function inicializarDB() {
             `CREATE INDEX IF NOT EXISTS idx_facturas_ot_id ON facturas(ot_id)`,
             `CREATE INDEX IF NOT EXISTS idx_facturas_rectificada_por ON facturas(rectificada_por_id)`,
             `CREATE INDEX IF NOT EXISTS idx_facturas_presupuesto_id ON facturas(presupuesto_id)`,
-            `CREATE INDEX IF NOT EXISTS idx_ot_cliente_id ON ordenes_trabajo(cliente_id)`
+            `CREATE INDEX IF NOT EXISTS idx_ot_cliente_id ON ordenes_trabajo(cliente_id)`,
+            // Quién realiza el trabajo a efectos de coste: 'Guille' / 'Jordi' (nómina de la
+            // otra empresa, sin coste hora hoy) o 'Autonomo' (subcontratado, con precio pactado).
+            `ALTER TABLE ordenes_trabajo ADD COLUMN tipo_trabajador TEXT`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }
@@ -160,9 +163,9 @@ async function inicializarDB() {
         if (rows[0].count === 0) {
             const bcrypt = require('bcryptjs');
             const seed = [
-                ['Giancarlo', 'gian123', 'admin'],
-                ['David',     'dav123',  'admin'],
-                ['Kevin',     'kev123',  'director']
+                ['Juliana', 'Jul123', 'admin'],
+                ['David',   'dav123', 'admin'],
+                ['Guille',  'Gui123', 'director']
             ];
             for (const [u, p, r] of seed) {
                 const hash = await bcrypt.hash(p, 12);

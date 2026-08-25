@@ -20,7 +20,7 @@ async function getAll(req, res) {
  *
  * Lógica de aprobación:
  *   - admin    → el cliente entra directamente como APROBADO
- *   - director → entra como PENDIENTE (Giancarlo/David deben aprobar)
+ *   - director → entra como PENDIENTE (Juliana/David deben aprobar)
  */
 async function crear(req, res) {
     const { nombre, nif, direccion, email, telefono, logo } = req.body;
@@ -35,7 +35,7 @@ async function crear(req, res) {
 
         const mensaje = estado === 'APROBADO'
             ? 'Cliente añadido a la BBDD'
-            : 'Petición enviada a Giancarlo';
+            : 'Petición enviada a Juliana';
 
         res.json({ mensaje });
     } catch (e) {

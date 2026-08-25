@@ -122,13 +122,7 @@ function abrirFacturaDesdeBBDD(id) {
 }
 
 function cargarUsuariosParaOT() {
-    fetch('/api/usuarios/nombres')
-        .then(res => res.json())
-        .then(data => {
-            const s = document.getElementById('ed_selTecnicosAdd');
-            s.innerHTML = '<option value="">-- Seleccionar --</option>';
-            data.forEach(u => { s.innerHTML += `<option value="${u.username}">${u.username} (${u.rol})</option>`; });
-        });
+    document.getElementById('ed_selTecnicosAdd').innerHTML = OPCIONES_TECNICOS_OT;
 }
 
 function agregarEdTecnicoOT() {
@@ -154,7 +148,7 @@ function renderizarEdTecnicosOT() {
 }
 
 function validarFormulario(codigo, fechaIn, fechaOut) {
-    if (!codigo.startsWith(prefijoAnoActual)) { alert(`❌ Debe empezar por ${prefijoAnoActual}`); return false; }
+    if (!codigo || !/^ot\d{2}\//i.test(codigo)) { alert('❌ El código de OT no es válido (debe ser tipo OT26/12345).'); return false; }
     if (fechaOut && new Date(fechaOut) <= new Date(fechaIn)) { alert('❌ Finalización debe ser posterior al inicio.'); return false; }
     return true;
 }

@@ -46,15 +46,15 @@ function abrirGastosSocios() {
 }
 
 function renderizarDeudas(gastos) {
-    const socios   = ['Giancarlo', 'David', 'Kevin'];
-    const balances = { Giancarlo: 0, David: 0, Kevin: 0 };
-    const desglose = { Giancarlo: [], David: [], Kevin: [] };
+    const socios   = ['Juliana', 'David', 'Guille'];
+    const balances = { Juliana: 0, David: 0, Guille: 0 };
+    const desglose = { Juliana: [], David: [], Guille: [] };
 
     gastos.forEach(g => {
         const pagador   = g.pagador;
         const importe   = parseFloat(g.importe);
         const esPago    = g.concepto.startsWith('[PAGO]');
-        const implStr   = g.implicados || 'Giancarlo,David,Kevin';
+        const implStr   = g.implicados || 'Juliana,David,Guille';
         const implicados = implStr.split(',');
 
         if (esPago) {

@@ -49,7 +49,7 @@ function subirFoto(event) {
 }
 
 function validarFormulario(codigo, fechaIn, fechaOut) {
-    if (!codigo.startsWith(prefijoAnoActual)) { alert(`❌ Debe empezar por ${prefijoAnoActual}`); return false; }
+    if (!codigo || !/^ot\d{2}\//i.test(codigo)) { alert('❌ El código de OT no es válido (debe ser tipo OT26/12345).'); return false; }
     if (fechaOut && new Date(fechaOut) <= new Date(fechaIn)) { alert('❌ Finalización debe ser posterior al inicio.'); return false; }
     return true;
 }
@@ -63,14 +63,16 @@ function inicializarUI() {
     document.getElementById('menuRol').innerText    = sesion.rol;
     document.getElementById('topAvatar').src        = sesion.foto || imgDefecto;
     const _menuAv = document.getElementById('menuAvatar'); if (_menuAv) _menuAv.src = sesion.foto || imgDefecto;
-    document.getElementById('codigo_ot').placeholder = `${prefijoAnoActual}00001`;
+    document.getElementById('codigo_ot').value = prefijoAnoActual;
 
     if (sesion.rol === 'admin' || sesion.rol === 'director') {
-        document.getElementById('menuGastosArea').style.display    = 'block';
+        // Módulo "Cuentas Claras" (gastos entre socios) apagado a petición del usuario:
+        // no se usa por el momento. Descomentar para reactivarlo.
+        // document.getElementById('menuGastosArea').style.display = 'block';
         document.getElementById('menuClientesArea').style.display  = 'block';
         document.getElementById('btnCrearTecnicoArea').innerHTML   = `<button class="btn-side" onclick="abrirModal('modalTecnico')">👷 Crear Perfil Técnico</button>`;
         document.getElementById('btnLogsArea').innerHTML           = `<button class="btn-side" style="background-color:#f39c12; margin-top:20px;" onclick="abrirLogs()">📝 Registro de Auditoría</button>`;
-        if (['Giancarlo', 'David', 'Kevin'].includes(sesion.username)) {
+        if (['Juliana', 'David', 'Guille'].includes(sesion.username)) {
             document.getElementById('g_pagador').value = sesion.username;
             document.getElementById('p_emisor').value  = sesion.username;
         }
@@ -92,20 +94,23 @@ let tecnicosSeleccionados    = [];
 let e_tecnicosSeleccionados  = [];
 let ed_tecnicosSeleccionados = [];
 
+/** Lista fija de quién puede ir a un trabajo (no son los usuarios de la app: Jordi y
+ *  el autónomo no tienen cuenta). "Autonomo" es el valor que activa el popup de precio/hora. */
+const OPCIONES_TECNICOS_OT =
+    '<option value="">-- Seleccionar --</option>' +
+    '<option value="David">David (Socio)</option>' +
+    '<option value="Guille">Guille (Socio)</option>' +
+    '<option value="Jordi">Jordi</option>' +
+    '<option value="Ayudante">Ayudante</option>' +
+    '<option value="Autonomo">Autónomo subcontratado</option>';
+
 function cargarUsuariosParaOT() {
-    API.get('/api/usuarios/nombres').then(data => {
-        const s1 = document.getElementById('selTecnicosAdd');
-        const s2 = document.getElementById('e_selTecnicosAdd');
-        const s3 = document.getElementById('ed_selTecnicosAdd');
-        const base = '<option value="">-- Seleccionar --</option>';
-        s1.innerHTML = base; s2.innerHTML = base;
-        if (s3) s3.innerHTML = base;
-        data.forEach(u => {
-            const opt = `<option value="${u.username}">${u.username} (${u.rol})</option>`;
-            s1.innerHTML += opt; s2.innerHTML += opt;
-            if (s3) s3.innerHTML += opt;
-        });
-    });
+    const s1 = document.getElementById('selTecnicosAdd');
+    const s2 = document.getElementById('e_selTecnicosAdd');
+    const s3 = document.getElementById('ed_selTecnicosAdd');
+    s1.innerHTML = OPCIONES_TECNICOS_OT;
+    s2.innerHTML = OPCIONES_TECNICOS_OT;
+    if (s3) s3.innerHTML = OPCIONES_TECNICOS_OT;
 }
 
 function agregarTecnicoOT()  { const s = document.getElementById('selTecnicosAdd');    if (s.value && !tecnicosSeleccionados.includes(s.value))    { tecnicosSeleccionados.push(s.value);    renderizarTecnicosOT();   } s.value = ''; }

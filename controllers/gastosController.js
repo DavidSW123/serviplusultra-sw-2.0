@@ -27,7 +27,7 @@ async function crear(req, res) {
     const fecha  = new Date().toLocaleString('es-ES');
     const impStr = Array.isArray(implicados)
         ? implicados.join(',')
-        : 'Giancarlo,David,Kevin';
+        : 'Juliana,David,Guille';
 
     try {
         await db.execute({

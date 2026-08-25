@@ -95,23 +95,27 @@ async function crear(req, res) {
     // Director: encola para aprobación
     if (usuario.rol === 'director') {
         await registrarLog(usuario.username, 'Añadir OT', datos.codigo_ot, datos, 'PENDIENTE');
-        return res.json({ mensaje: 'OT enviada a Giancarlo para su aprobación.' });
+        return res.json({ mensaje: 'OT enviada a Juliana para su aprobación.' });
     }
 
     // Admin: inserta directamente
     const estado = datos.fecha_completada ? 'HECHO' : 'PENDIENTE';
+    // 0 es un precio/hora válido (Guille/Jordi, nómina de la otra empresa): no debe
+    // caer al valor por defecto de 15 como haría "parseFloat(...) || 15".
+    const phParsed  = parseFloat(datos.precio_hora);
+    const precioHora = Number.isFinite(phParsed) ? phParsed : 15;
     try {
         const r = await db.execute({
             sql:  `INSERT INTO ordenes_trabajo
                        (codigo_ot, fecha_encargo, fecha_completada, horas, num_tecnicos,
-                        marca, tipo_urgencia, materiales_precio, estado, cliente_id, tecnicos_nombres, precio_hora)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        marca, tipo_urgencia, materiales_precio, estado, cliente_id, tecnicos_nombres, precio_hora, tipo_trabajador)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
                 datos.codigo_ot, datos.fecha_encargo, datos.fecha_completada || null,
                 datos.horas, datos.num_tecnicos, datos.marca, datos.tipo_urgencia,
                 datos.materiales_precio, estado, datos.cliente_id || null,
                 datos.tecnicos_nombres || '',
-                parseFloat(datos.precio_hora) || 15
+                precioHora, datos.tipo_trabajador || null
             ]
         });
 
@@ -198,7 +202,7 @@ async function cambiarEstado(req, res) {
             { id, nuevoEstado: estado },
             'PENDIENTE'
         );
-        return res.json({ mensaje: 'Petición enviada a Giancarlo.' });
+        return res.json({ mensaje: 'Petición enviada a Juliana.' });
     }
 
     try {
@@ -232,7 +236,7 @@ async function eliminar(req, res) {
 
     if (usuario.rol === 'director') {
         await registrarLog(usuario.username, 'Eliminar OT', `Borrado OT ID: ${id}`, { id }, 'PENDIENTE');
-        return res.json({ mensaje: 'Petición enviada a Giancarlo.' });
+        return res.json({ mensaje: 'Petición enviada a Juliana.' });
     }
 
     try {

@@ -52,7 +52,9 @@ function preguntarMateriales(e) {
     e.preventDefault();
     modoEdicionOT = null;
     if (tecnicosSeleccionados.length === 0) { alert('❌ Debes asignar al menos a un técnico.'); return; }
-    const codigo   = document.getElementById('codigo_ot').value;
+    const codigo = normalizarCodigoOT(document.getElementById('codigo_ot').value);
+    if (!codigo) { alert('❌ Introduce un código de OT válido.'); return; }
+    document.getElementById('codigo_ot').value = codigo;
     const fechaEn  = document.getElementById('fecha_encargo').value;
     const fechaCo  = document.getElementById('fecha_completada').value;
     if (!validarFormulario(codigo, fechaEn, fechaCo)) return;
@@ -197,19 +199,26 @@ function guardarOTFinal(tieneMateriales) {
     };
     _otTieneMateriales = tieneMateriales;
 
-    // Solo admin y director eligen el precio/hora; técnicos usan 15 € por defecto
+    // Solo admin y director; el precio/hora solo aplica si hay un autónomo subcontratado
+    // entre los técnicos añadidos (los demás no tienen coste hora para esta empresa).
     if (sesion.rol === 'admin' || sesion.rol === 'director') {
-        document.getElementById('inputPrecioHora').value = 15;
         if (tieneMateriales) cerrarModal('modalLineasMateriales');
-        document.getElementById('modalPrecioHora').style.display = 'block';
+        if (tecnicosSeleccionados.includes('Autonomo')) {
+            document.getElementById('inputPrecioHora').value = '';
+            document.getElementById('modalPrecioHora').style.display = 'block';
+        } else {
+            _enviarOT(0);
+        }
     } else {
         _enviarOT(15);
     }
 }
 
 function confirmarPrecioHora(precio) {
+    if (!(precio > 0)) { alert('❌ Introduce el precio/hora pactado.'); return; }
     document.getElementById('modalPrecioHora').style.display = 'none';
-    _enviarOT(parseFloat(precio) || 15);
+    _datosOTPendientes.tipo_trabajador = 'Autonomo';
+    _enviarOT(precio);
 }
 
 function _enviarOT(precioHora) {
