@@ -759,10 +759,12 @@ function _construirPdfFactura(doc, d) {
         doc.font(FBOLD).fillColor(dark).text(label, sx, yy, { lineBreak: false });
         doc.font(fVal).fillColor(colVal).text(valor, sx + wL, yy, { lineBreak: false });
     };
-    _dato(facY + 8,  'Nº de Factura: ',    String(d.numero || '—'), FBOLD, numColor, 11);
-    _dato(facY + 26, 'Ref. OT: ',          String(d.otCode || '—'), FREG,  '#555', 10);
-    _dato(facY + 41, 'Fecha de emisión: ', String(d.fecha  || '—'), FREG,  '#555', 10);
-    const derEnd = facY + 55;
+    // Factura Directa (sin OT, d.otCode vacío): sin línea "Ref. OT".
+    _dato(facY + 8, 'Nº de Factura: ', String(d.numero || '—'), FBOLD, numColor, 11);
+    let yDato = facY + 26;
+    if (d.otCode) { _dato(yDato, 'Ref. OT: ', String(d.otCode), FREG, '#555', 10); yDato += 15; }
+    _dato(yDato, 'Fecha de emisión: ', String(d.fecha || '—'), FREG, '#555', 10);
+    const derEnd = yDato + 14;
 
     // ── Nombre de empresa (GRANDE y centrado) + barra teal del ancho del nombre ──
     const nombreEmp = 'ServiPlusUltra Solutions S.L.';
@@ -776,18 +778,22 @@ function _construirPdfFactura(doc, d) {
     const izqEnd = doc.y;
 
     // ── Caja de cliente (derecha) ──
+    // Factura Directa (sin OT): sin nombre de cliente, solo dirección, bajo "Emitida a:".
     const cli = d.cliente || {};
+    const esDirecta = !d.otCode;
     const bw = 250, bx = right - bw, by = Math.max(derEnd + 14, logoBottom + 16);
     doc.font(FREG).fontSize(8.5);
-    let bh = 42;
-    if (cli.nif) bh += 12;
+    let bh = esDirecta ? 28 : 42;
+    if (!esDirecta && cli.nif) bh += 12;
     if (cli.direccion) bh += doc.heightOfString('Dir: ' + cli.direccion, { width: bw - 24 });
     doc.save().roundedRect(bx, by, bw, bh, 4).fill('#f0f4f8').restore();
-    doc.fillColor(dark).font(FBOLD).fontSize(9).text('Facturar a:', bx + 12, by + 9, { width: bw - 24 });
-    doc.font(FBOLD).fontSize(11).fillColor(dark).text(cli.nombre || 'Consumidor Final', bx + 12, doc.y + 1, { width: bw - 24 });
+    doc.fillColor(dark).font(FBOLD).fontSize(9).text(esDirecta ? 'Emitida a:' : 'Facturar a:', bx + 12, by + 9, { width: bw - 24 });
+    if (!esDirecta) {
+        doc.font(FBOLD).fontSize(11).fillColor(dark).text(cli.nombre || 'Consumidor Final', bx + 12, doc.y + 1, { width: bw - 24 });
+    }
     doc.font(FREG).fontSize(8.5).fillColor('#555');
-    if (cli.nif)       doc.text(`NIF/CIF: ${cli.nif}`, bx + 12, doc.y + 2, { width: bw - 24 });
-    if (cli.direccion) doc.text(`Dir: ${cli.direccion}`, bx + 12, doc.y, { width: bw - 24 });
+    if (!esDirecta && cli.nif) doc.text(`NIF/CIF: ${cli.nif}`, bx + 12, doc.y + 2, { width: bw - 24 });
+    if (cli.direccion) doc.text(`Dir: ${cli.direccion}`, bx + 12, doc.y + (esDirecta ? 2 : 0), { width: bw - 24 });
 
     // ── Cabecera de la tabla (OSCURA) ──
     let y = Math.max(izqEnd, by + bh) + 26;
