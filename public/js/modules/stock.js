@@ -51,6 +51,10 @@ let modoEdicionOT  = null;
 function preguntarMateriales(e) {
     e.preventDefault();
     modoEdicionOT = null;
+    if (!document.getElementById('ot_cliente_id').value) {
+        alert('❌ Toda OT necesita un cliente. Si no hay cliente, usa "🧾 Factura Directa" en su lugar.');
+        return;
+    }
     if (tecnicosSeleccionados.length === 0) { alert('❌ Debes asignar al menos a un técnico.'); return; }
     const codigo = normalizarCodigoOT(document.getElementById('codigo_ot').value);
     if (!codigo) { alert('❌ Introduce un código de OT válido.'); return; }

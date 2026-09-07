@@ -509,6 +509,139 @@ async function confirmarRectificar() {
     cerrarModal('modalFactura');
 }
 
+// ── Factura Directa (sin OT, cliente "Consumidor Final", dirección por factura) ──
+
+let lineasDirecta = [];
+let facturasDirectasCache = [];
+
+function abrirFacturaDirecta() {
+    lineasDirecta = [];
+    document.getElementById('directaDireccion').value = '';
+    _renderLineasDirecta();
+    abrirModal('modalFacturaDirecta');
+}
+
+function directaAgregarLinea()        { lineasDirecta.push({ concepto: '', cantidad: 1, precio: 0 }); _renderLineasDirecta(); }
+function directaBorrarLinea(i)        { lineasDirecta.splice(i, 1); _renderLineasDirecta(); }
+function directaActualizarLinea(i,c,v){ lineasDirecta[i][c] = c === 'concepto' ? v : (parseFloat(v) || 0); _renderLineasDirecta(); }
+
+function _renderLineasDirecta() {
+    const tbody = document.getElementById('tbodyDirectaLineas');
+    tbody.innerHTML = '';
+    let base = 0;
+    lineasDirecta.forEach((l, idx) => {
+        const t = (parseFloat(l.cantidad)||0) * (parseFloat(l.precio)||0);
+        base += t;
+        tbody.innerHTML += `<tr>
+            <td><input type="text"   value="${(l.concepto||'').replace(/"/g,'&quot;')}" onchange="directaActualizarLinea(${idx},'concepto',this.value)"></td>
+            <td><input type="number" step="0.1"  value="${l.cantidad}" onchange="directaActualizarLinea(${idx},'cantidad',this.value)"></td>
+            <td><input type="number" step="0.01" value="${l.precio}"   onchange="directaActualizarLinea(${idx},'precio',this.value)"></td>
+            <td style="text-align:right;">${t.toFixed(2)} €</td>
+            <td><button class="btn-peligro" onclick="directaBorrarLinea(${idx})">🗑️</button></td>
+        </tr>`;
+    });
+    const iva = base * 0.21;
+    document.getElementById('directaBase').innerText  = base.toFixed(2);
+    document.getElementById('directaIva').innerText   = iva.toFixed(2);
+    document.getElementById('directaTotal').innerText = (base + iva).toFixed(2);
+}
+
+async function confirmarFacturaDirecta() {
+    const direccion = document.getElementById('directaDireccion').value.trim();
+    if (!direccion) { alert('❌ Indica la dirección de facturación.'); return; }
+    if (lineasDirecta.length === 0) { alert('❌ Añade al menos una línea.'); return; }
+
+    const cliente = clientesGlobal.find(c => c.nombre === 'Consumidor Final');
+    if (!cliente) { alert('❌ No se encuentra el cliente "Consumidor Final". Recarga la página.'); return; }
+
+    const base  = parseFloat(document.getElementById('directaBase').innerText);
+    const iva   = parseFloat(document.getElementById('directaIva').innerText);
+    const total = parseFloat(document.getElementById('directaTotal').innerText);
+    if (!confirm(`¿Emitir factura directa por ${total.toFixed(2)} € a "${direccion}"?\n\nSe asignará número definitivo y quedará inmutable.`)) return;
+
+    const r = await API.post('/api/factura', {
+        ot_id: null, cliente_id: cliente.id, direccion_facturacion: direccion,
+        lineas: lineasDirecta, base_imponible: base, iva, total
+    });
+    if (r.error) { alert('❌ ' + r.error); return; }
+    cerrarModal('modalFacturaDirecta');
+    alert(`✅ Factura directa emitida: ${r.numero_factura}`);
+    abrirListaDirectas();
+}
+
+/** Construye el payload de PDF/email para una factura directa a partir de su fila (de la lista). */
+function _datosDirecta(row) {
+    let lineas = [];
+    try { lineas = JSON.parse(row.lineas || '[]'); } catch (_) {}
+    return {
+        numero: row.numero_factura, fecha: row.fecha_emision, otCode: '',
+        cliente: { nombre: row.cliente_nombre || 'Consumidor Final', nif: row.cliente_nif || '', direccion: row.direccion_facturacion || '' },
+        lineas, base: parseFloat(row.base_imponible)||0, iva: parseFloat(row.iva)||0, total: parseFloat(row.total)||0,
+        qr_data: row.qr_data || null
+    };
+}
+
+async function abrirListaDirectas() {
+    facturasDirectasCache = await API.get('/api/facturas/directas');
+    const tbody = document.getElementById('tbodyDirectasList');
+    if (!Array.isArray(facturasDirectasCache) || facturasDirectasCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888; padding:20px;">No hay facturas directas emitidas todavía.</td></tr>';
+    } else {
+        tbody.innerHTML = facturasDirectasCache.map(f => `
+            <tr>
+                <td><strong style="color:#1abc9c;">${escapeHTML(f.numero_factura || '—')}</strong></td>
+                <td>${f.fecha_emision || '—'}</td>
+                <td>${escapeHTML(f.cliente_nombre || '—')}</td>
+                <td>${escapeHTML(f.direccion_facturacion || '—')}</td>
+                <td style="text-align:right;"><strong>${parseFloat(f.total||0).toFixed(2)} €</strong></td>
+                <td style="white-space:nowrap;">
+                    <button class="btn-secundario" style="padding:5px 10px; font-size:0.85em;" onclick="descargarDirectaPDF(${f.id})">⬇️ PDF</button>
+                    <button class="btn-save" style="padding:5px 10px; font-size:0.85em; margin:0;" onclick="enviarDirectaEmail(${f.id})">📧 Enviar</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    abrirModal('modalListaDirectas');
+}
+
+async function descargarDirectaPDF(facturaId) {
+    const row = facturasDirectasCache.find(f => f.id === facturaId);
+    if (!row) return;
+    try {
+        const resp = await fetch('/api/factura/pdf', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+            body: JSON.stringify(_datosDirecta(row))
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url; a.download = 'Factura-' + (row.numero_factura || 'directa').replace(/[^\w-]/g, '') + '.pdf';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) {
+        alert('❌ No se pudo descargar el PDF (' + (e.message || e) + ').');
+    }
+}
+
+async function enviarDirectaEmail(facturaId) {
+    const row = facturasDirectasCache.find(f => f.id === facturaId);
+    if (!row) return;
+    const email = prompt('Email del destinatario:');
+    if (!email || !email.includes('@')) { if (email !== null) alert('❌ Email no válido.'); return; }
+
+    const data = await API.post('/api/enviar-factura', {
+        factura_id:    facturaId,
+        emailDestino:  email,
+        asunto:        `Factura ${row.numero_factura} - ServiPlusUltra`,
+        htmlBody:      `<div style="font-family:Arial;padding:20px;"><h2>Hola,</h2><p>Adjuntamos la factura <strong>${row.numero_factura}</strong>.</p></div>`,
+        nombreArchivo: 'Factura-' + (row.numero_factura || 'directa').replace(/[^\w-]/g, '') + '.pdf',
+        datos:         _datosDirecta(row)
+    });
+    if (data.error) { alert('❌ ' + data.error); return; }
+    alert('✅ ' + data.mensaje);
+}
+
 function _renderQRFactura(qrDataUrl) {
     const bloque = document.getElementById('bloqueQRFact');
     const img    = document.getElementById('factQRImg');

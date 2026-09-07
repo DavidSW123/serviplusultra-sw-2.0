@@ -9,7 +9,9 @@ function cargarClientes() {
         const selFact = document.getElementById('selClienteFactura');
         const selEdOt = document.getElementById('ed_ot_cliente_id');
 
-        selOt.innerHTML   = '<option value="">-- Sin asignar / General --</option>';
+        // Al crear OT el cliente es obligatorio (sin cliente = Factura Directa, no OT):
+        // opción vacía deshabilitada para forzar a elegir uno real.
+        selOt.innerHTML   = '<option value="" disabled selected>-- Selecciona un cliente --</option>';
         selFact.innerHTML = '<option value="">-- Seleccionar Cliente --</option>';
         if (selEdOt) selEdOt.innerHTML = '<option value="">-- Sin asignar / General --</option>';
 

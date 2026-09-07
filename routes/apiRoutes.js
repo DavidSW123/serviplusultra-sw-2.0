@@ -67,6 +67,7 @@ router.get   ('/facturas/diagnostico',       soloAdmin,   facturaController.diag
 router.post  ('/facturas/:id/rectificar',         soloAdmin, facturaController.rectificar);
 router.post  ('/facturas/:id/reasignar-numero',   soloAdmin, facturaController.reasignarNumero);
 router.get   ('/facturas/rectificativas',    autenticado, facturaController.listarRectificativas);
+router.get   ('/facturas/directas',          autenticado, facturaController.listarDirectas);
 router.get   ('/facturas/:id',               autenticado, facturaController.getFactura);
 
 // ============================================================

@@ -30,7 +30,7 @@ async function inicializarDB() {
 
         await db.execute(`CREATE TABLE IF NOT EXISTS ordenes_trabajo (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo_ot        TEXT UNIQUE NOT NULL,
+            codigo_ot        TEXT NOT NULL,
             fecha_encargo    TEXT,
             fecha_completada TEXT,
             horas            REAL,
@@ -107,6 +107,48 @@ async function inicializarDB() {
             FOREIGN KEY (cliente_id) REFERENCES clientes (id)
         )`);
 
+        // Migración estructural: el código de OT ya no es único globalmente, sino por
+        // cliente (dos clientes distintos pueden tener ambos "OT26/0001"). En SQLite no
+        // se puede quitar un UNIQUE de columna con ALTER TABLE: hay que reconstruir la
+        // tabla. Guardada por idempotencia (se salta si ya se aplicó). Turso sí exige
+        // foreign_keys=OFF para poder hacer DROP TABLE mientras "facturas.ot_id" la referencia.
+        const yaMigrado = await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_ot_codigo_cliente'"
+        );
+        if (yaMigrado.rows.length === 0) {
+            await db.execute('PRAGMA foreign_keys=OFF');
+            await db.execute(`CREATE TABLE ordenes_trabajo_new (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                codigo_ot        TEXT NOT NULL,
+                fecha_encargo    TEXT,
+                fecha_completada TEXT,
+                horas            REAL,
+                num_tecnicos     INTEGER,
+                marca            TEXT,
+                tipo_urgencia    TEXT,
+                materiales_precio REAL,
+                estado           TEXT DEFAULT 'PENDIENTE',
+                cliente_id       INTEGER,
+                tecnicos_nombres TEXT DEFAULT '',
+                precio_hora      REAL DEFAULT 15,
+                tipo_trabajador  TEXT
+            )`);
+            await db.execute(`INSERT INTO ordenes_trabajo_new
+                (id, codigo_ot, fecha_encargo, fecha_completada, horas, num_tecnicos, marca, tipo_urgencia,
+                 materiales_precio, estado, cliente_id, tecnicos_nombres, precio_hora, tipo_trabajador)
+                SELECT id, codigo_ot, fecha_encargo, fecha_completada, horas, num_tecnicos, marca, tipo_urgencia,
+                       materiales_precio, estado, cliente_id, tecnicos_nombres, precio_hora, tipo_trabajador
+                FROM ordenes_trabajo`);
+            const antes   = await db.execute('SELECT COUNT(*) c FROM ordenes_trabajo');
+            const despues = await db.execute('SELECT COUNT(*) c FROM ordenes_trabajo_new');
+            if (antes.rows[0].c !== despues.rows[0].c) {
+                throw new Error('Migración codigo_ot: no coincide el número de filas copiadas, abortado.');
+            }
+            await db.execute('DROP TABLE ordenes_trabajo');
+            await db.execute('ALTER TABLE ordenes_trabajo_new RENAME TO ordenes_trabajo');
+            await db.execute('PRAGMA foreign_keys=ON');
+        }
+
         // --- MIGRACIONES SEGURAS (idempotentes) ---
         const migraciones = [
             `ALTER TABLE ordenes_trabajo ADD COLUMN cliente_id INTEGER`,
@@ -148,7 +190,17 @@ async function inicializarDB() {
             `CREATE INDEX IF NOT EXISTS idx_ot_cliente_id ON ordenes_trabajo(cliente_id)`,
             // Quién realiza el trabajo a efectos de coste: 'Guille' / 'Jordi' (nómina de la
             // otra empresa, sin coste hora hoy) o 'Autonomo' (subcontratado, con precio pactado).
-            `ALTER TABLE ordenes_trabajo ADD COLUMN tipo_trabajador TEXT`
+            `ALTER TABLE ordenes_trabajo ADD COLUMN tipo_trabajador TEXT`,
+            // Código de OT único por cliente (no globalmente): dos clientes distintos pueden
+            // compartir "OT26/0001"; sin cliente asignado se trata como un cubo compartido.
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_ot_codigo_cliente ON ordenes_trabajo(codigo_ot, COALESCE(cliente_id, -1))`,
+            // Facturas directas (sin OT): cliente fijo "Consumidor Final" + dirección propia
+            // de cada factura (varía en cada una, no es la dirección fija de un cliente normal).
+            `ALTER TABLE facturas ADD COLUMN cliente_id INTEGER`,
+            `ALTER TABLE facturas ADD COLUMN direccion_facturacion TEXT`,
+            `INSERT INTO clientes (nombre, nif, direccion, email, telefono, logo, estado)
+             SELECT 'Consumidor Final', NULL, NULL, NULL, NULL, '', 'APROBADO'
+             WHERE NOT EXISTS (SELECT 1 FROM clientes WHERE nombre='Consumidor Final')`
         ];
         for (const sql of migraciones) {
             try { await db.execute(sql); } catch (_) { /* columna ya existe, ok */ }

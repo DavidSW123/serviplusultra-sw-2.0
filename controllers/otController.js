@@ -84,7 +84,7 @@ async function crear(req, res) {
     const { usuario } = req;
     const datos = req.body;
 
-    const err = validarOT(datos);
+    const err = validarOT(datos, { esNueva: true });
     if (err) return res.status(400).json({ error: err });
 
     // Calculamos el total de materiales desde las líneas
@@ -129,7 +129,7 @@ async function crear(req, res) {
 
     } catch (e) {
         if (e.message?.includes('UNIQUE')) {
-            res.status(400).json({ error: 'Ese código de OT ya está registrado.' });
+            res.status(400).json({ error: 'Ese código de OT ya está registrado para ese cliente (o sin cliente asignado).' });
         } else {
             errorServidor(res, e);
         }
@@ -174,7 +174,7 @@ async function editar(req, res) {
 
     } catch (e) {
         if (e.message?.includes('UNIQUE')) {
-            res.status(400).json({ error: 'Ese código de OT ya está registrado.' });
+            res.status(400).json({ error: 'Ese código de OT ya está registrado para ese cliente (o sin cliente asignado).' });
         } else {
             errorServidor(res, e);
         }

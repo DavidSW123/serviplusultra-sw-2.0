@@ -208,16 +208,19 @@ async function asignarNumero(req, res) {
 
 /**
  * POST /api/factura
- * Body: { ot_id, base_imponible, iva, total, lineas }
+ * Body: { ot_id, base_imponible, iva, total, lineas, cliente_id, direccion_facturacion }
  * EMITE la factura de la OT: asigna número correlativo y la congela (estado EMITIDA).
  * Si ya hay una EMITIDA activa → idempotente (la devuelve).
  * Si hay un BORRADOR → lo convierte en EMITIDA.
+ * Si ot_id es null es una "Factura Directa" (sin OT): cliente_id y direccion_facturacion
+ * identifican a quién y a qué dirección se factura; siempre crea una factura nueva.
  */
 async function emitir(req, res) {
-    const { ot_id, base_imponible, iva, total, lineas } = req.body;
+    const { base_imponible, iva, total, lineas, cliente_id, direccion_facturacion } = req.body;
+    const ot_id = req.body.ot_id ?? null;   // null = Factura Directa (sin OT)
 
     try {
-        const activa = await _facturaActiva(ot_id);
+        const activa = ot_id ? await _facturaActiva(ot_id) : null;
         if (activa && activa.estado === 'EMITIDA') {
             return res.json({
                 mensaje:        'Factura ya registrada',
@@ -244,11 +247,12 @@ async function emitir(req, res) {
                 args: [numero_factura, fecha, ahora, qr, base_imponible, iva, total, lineasJSON, activa.id]
             });
         } else {
-            // Crear directamente como EMITIDA
+            // Crear directamente como EMITIDA (cliente_id/direccion_facturacion solo se
+            // usan en Facturas Directas; en las de OT van null y el cliente sale de la OT).
             await db.execute({
-                sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura, lineas, estado, emitida_en)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'EMITIDA', ?)`,
-                args: [ot_id, base_imponible, iva, total, qr, fecha, numero_factura, lineasJSON, ahora]
+                sql:  `INSERT INTO facturas (ot_id, base_imponible, iva, total, qr_data, fecha_emision, numero_factura, lineas, estado, emitida_en, cliente_id, direccion_facturacion)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'EMITIDA', ?, ?, ?)`,
+                args: [ot_id, base_imponible, iva, total, qr, fecha, numero_factura, lineasJSON, ahora, cliente_id || null, direccion_facturacion || null]
             });
         }
 
@@ -550,12 +554,14 @@ async function getFactura(req, res) {
                          p.referencia AS presupuesto_ref,
                          orig.numero_factura AS rectifica_a_numero,
                          rect.id          AS rectificada_por_id_join,
-                         rect.numero_factura AS rectificada_por_numero
+                         rect.numero_factura AS rectificada_por_numero,
+                         cli.nombre AS cliente_nombre, cli.nif AS cliente_nif, cli.direccion AS cliente_direccion_base
                   FROM facturas f
                   LEFT JOIN ordenes_trabajo ot ON ot.id = f.ot_id
                   LEFT JOIN presupuestos    p  ON p.id  = f.presupuesto_id
                   LEFT JOIN facturas        orig ON orig.id = f.factura_rectificada_id
                   LEFT JOIN facturas        rect ON rect.id = f.rectificada_por_id
+                  LEFT JOIN clientes        cli  ON cli.id = f.cliente_id
                   WHERE f.id = ?`,
             args: [id]
         });
@@ -584,6 +590,27 @@ async function listarRectificativas(req, res) {
             LEFT JOIN presupuestos    p    ON p.id    = f.presupuesto_id
             LEFT JOIN clientes        c    ON c.id    = COALESCE(ot.cliente_id, p.cliente_id)
             WHERE f.es_rectificativa = 1
+            ORDER BY f.id DESC
+        `);
+        res.json(rows);
+    } catch (e) {
+        errorServidor(res, e);
+    }
+}
+
+/**
+ * GET /api/facturas/directas
+ * Lista las Facturas Directas (sin OT: ot_id IS NULL) con su cliente y dirección.
+ */
+async function listarDirectas(req, res) {
+    try {
+        const { rows } = await db.execute(`
+            SELECT f.id, f.numero_factura, f.fecha_emision, f.base_imponible, f.iva, f.total,
+                   f.estado, f.lineas, f.qr_data, f.emails_enviados, f.direccion_facturacion,
+                   cli.nombre AS cliente_nombre, cli.nif AS cliente_nif
+            FROM facturas f
+            LEFT JOIN clientes cli ON cli.id = f.cliente_id
+            WHERE f.ot_id IS NULL AND COALESCE(f.es_rectificativa, 0) = 0
             ORDER BY f.id DESC
         `);
         res.json(rows);
@@ -858,4 +885,4 @@ async function generarPdf(req, res) {
     }
 }
 
-module.exports = { emitir, guardarBorrador, asignarNumero, enviarEmail, testEmail, registrarEnvio, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, reasignarNumero, generarPdf };
+module.exports = { emitir, guardarBorrador, asignarNumero, enviarEmail, testEmail, registrarEnvio, actualizarLineas, emitirDesdePresupuesto, purgarHuerfanas, diagnostico, rectificar, getFactura, listarRectificativas, listarDirectas, reasignarNumero, generarPdf };
